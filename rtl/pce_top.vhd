@@ -389,7 +389,7 @@ port map (
 	address_a=> VRAM0_A(14 downto 0),
 	data_a	=> VRAM0_DO,
 	cs_a		=> not VRAM0_A(15),
-	wren_a	=> VRAM0_WE,
+	wren_a	=> VRAM0_WE and VDC_CLKEN,
 	q_a		=> VRAM0_DI,
 
 	address_b=> CLR_A,
@@ -446,7 +446,7 @@ generate_SGX: if (LITE = 0) generate begin
 		address_a=> VRAM1_A(14 downto 0),
 		data_a	=> VRAM1_DO,
 		cs_a		=> not VRAM1_A(15),
-		wren_a	=> VRAM1_WE and not VRAM1_A(15),
+		wren_a	=> VRAM1_WE and not VRAM1_A(15) and VDC_CLKEN,
 		q_a		=> VRAM1_DI,
 
 		address_b=> CLR_A,

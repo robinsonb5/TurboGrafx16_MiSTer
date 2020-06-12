@@ -33,6 +33,7 @@ entity HUC6270 is
 		RAM_A		: out std_logic_vector(15 downto 0);
 		RAM_DI	: in std_logic_vector(15 downto 0);
 		RAM_DO	: out std_logic_vector(15 downto 0);
+		RAM_RD	: out std_logic;
 		RAM_WE	: out std_logic;
 		
 		BG_EN		: in std_logic;
@@ -1366,6 +1367,7 @@ begin
 	begin
 		RAM_DO <= x"0000";
 		RAM_WE <= '0';
+		RAM_RD <= '1';
 		case SLOT is
 			when BAT | CG0 | CG1 =>
 				RAM_A <= BG_RAM_ADDR;
@@ -1380,16 +1382,19 @@ begin
 					else
 						RAM_A <= DESR;
 						RAM_DO <= DMA_BUF;
-						RAM_WE <= DCK_CE;
+						RAM_WE <= '1';
+						RAM_RD <= '0';
 					end if;
 				elsif CPUWR_EXEC = '1' then
 					RAM_A <= CPU_VRAM_ADDR;
 					RAM_DO <= CPU_VRAM_DATA;
-					RAM_WE <= DCK_CE;
+					RAM_WE <= '1';
+					RAM_RD <= '0';
 				else
 					RAM_A <= CPU_VRAM_ADDR;
 				end if; 
 			when others =>
+				RAM_RD <= '0';
 				RAM_A <= x"0000";
 		end case;
 	end process;
