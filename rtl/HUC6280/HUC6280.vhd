@@ -5,6 +5,10 @@ library work;
 use work.HUC6280_PKG.all;
 
 entity HUC6280 is
+	generic (
+		PSG_O_WIDTH : integer := 24;
+		VOLTAB_FILE: string := "HUC6280/voltab.mif"
+	);
 	port( 
 		CLK		: in std_logic;
 		RST_N		: in std_logic;
@@ -34,8 +38,8 @@ entity HUC6280 is
 		
 		VDCNUM	: in std_logic;
 		
-		AUD_LDATA: out std_logic_vector(23 downto 0);
-		AUD_RDATA: out std_logic_vector(23 downto 0)
+		AUD_LDATA: out std_logic_vector(PSG_O_WIDTH-1 downto 0);
+		AUD_RDATA: out std_logic_vector(PSG_O_WIDTH-1 downto 0)
 	);
 end HUC6280;
 
@@ -272,7 +276,12 @@ begin
 	
 	-- PSG
 	PSG_SEL <= '1' when CPU_A(20 downto 13) = x"FF" and CPU_A(12 downto 10) = "010" else '0'; -- PSG : $0800 - $0BFF
-	PSG : entity work.psg port map (
+	PSG : entity work.psg
+	generic map (
+		O_WIDTH => PSG_O_WIDTH,
+		VOLTAB_FILE => VOLTAB_FILE
+	)
+	port map (
 		CLK		=> CLK,
 		CLKEN		=> IO_CE,	-- 7.16 Mhz clock
 		RESET_N	=> RST_N,

@@ -4,6 +4,10 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity psg is
+	generic (
+		O_WIDTH : integer := 24;
+		VOLTAB_FILE: string := "HUC6280/voltab.mif"
+	);
 	port (
 		CLK 	: in std_logic;
 		CLKEN	: in std_logic;
@@ -16,8 +20,8 @@ entity psg is
 
 		-- DAC Interface
 		DAC_LATCH	: in std_logic;
-		LDATA		: out std_logic_vector(23 downto 0);
-		RDATA		: out std_logic_vector(23 downto 0)
+		LDATA		: out std_logic_vector(O_WIDTH-1 downto 0);
+		RDATA		: out std_logic_vector(O_WIDTH-1 downto 0)
 	);
 end psg;
 
@@ -74,18 +78,18 @@ type chanarray_t is array(0 to 5) of chan_t;
 signal CH		: chanarray_t;
 
 -- Channels mixing
-signal LACC		: std_logic_vector(23 downto 0);
-signal RACC		: std_logic_vector(23 downto 0);
+signal LACC		: std_logic_vector(O_WIDTH-1 downto 0);
+signal RACC		: std_logic_vector(O_WIDTH-1 downto 0);
 
 signal VT_ADDR	: std_logic_vector(11 downto 0);
-signal VT_DATA	: std_logic_vector(23 downto 0);
+signal VT_DATA	: std_logic_vector(O_WIDTH-1 downto 0);
 
 type mix_t is ( MIX_WAIT, MIX_NEXT, MIX_LREAD, MIX_LNEXT, MIX_RREAD, MIX_RNEXT, MIX_END );
 signal MIX		: mix_t;
 signal MIX_CNT	: std_logic_vector(2 downto 0);
 
-signal LDATA_FF	: std_logic_vector(23 downto 0);
-signal RDATA_FF	: std_logic_vector(23 downto 0);
+signal LDATA_FF	: std_logic_vector(O_WIDTH-1 downto 0);
+signal RDATA_FF	: std_logic_vector(O_WIDTH-1 downto 0);
 
 begin
 
@@ -295,7 +299,7 @@ begin
 end process;
 
 -- Channels mixing
-VT : entity work.dpram generic map (12,24,"HUC6280/voltab.mif")
+VT : entity work.dpram generic map (12,O_WIDTH,VOLTAB_FILE)
 port map (
 	clock		=> CLK,
 	address_a=> VT_ADDR,
