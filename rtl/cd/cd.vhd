@@ -18,6 +18,14 @@ entity cd is
 		EXT_RD_N		: in  std_logic;
 		CPU_CE		: in  std_logic;
 		
+	--ADPCM DRAM
+		ADRAM_A		: out std_logic_vector(16 downto 0);
+		ADRAM_DI	: out std_logic_vector(3 downto 0);
+		ADRAM_DO	: in  std_logic_vector(3 downto 0);
+		ADRAM_WE	: out std_logic;
+		ADRAM_RD  : out std_logic;
+		ADRAM_CLKEN : out std_logic;
+
 		SEL_N			: out std_logic;
 		IRQ_N			: out std_logic;
 		
@@ -110,12 +118,6 @@ architecture rtl of cd is
 	signal ADPCM_READ_NIB	: std_logic;
 	signal WRITE_PEND			: std_logic;
 	signal READ_PEND			: std_logic;
-	
-	--ADPCM DRAM
-	signal ADRAM_A				: std_logic_vector(16 downto 0);
-	signal ADRAM_DI			: std_logic_vector(3 downto 0);
-	signal ADRAM_DO			: std_logic_vector(3 downto 0);
-	signal ADRAM_WE			: std_logic;
 	
 	type DRAMSlot_t is (
 		SLOT_REFRESH,
@@ -585,19 +587,20 @@ begin
 		end case;
 	end process;
 	
-	ADPCM_DRAM : entity work.dpram generic map (17,4)
-	port map (
-		clock		=> CLK,
-		address_a=> ADRAM_A,
-		data_a	=> ADRAM_DI,
-		wren_a	=> ADRAM_WE,
-		q_a		=> ADRAM_DO
-	);
+--	ADPCM_DRAM : entity work.dpram generic map (17,4)
+--	port map (
+--		clock		=> CLK,
+--		address_a=> ADRAM_A,
+--		data_a	=> ADRAM_DI,
+--		wren_a	=> ADRAM_WE,
+--		q_a		=> ADRAM_DO
+--	);
 	ADRAM_A <= ADPCM_WRADDR when DRAM_SLOT = SLOT_WRITE else ADPCM_RDADDR;
 	ADRAM_DI <= ADPCM_WRDATA(3 downto 0) when ADPCM_WRITE_NIB = '1' else ADPCM_WRDATA(7 downto 4);
-	ADRAM_WE <= DRAM_CLKEN when DRAM_SLOT = SLOT_WRITE and (ADPCM_WRITE_PEND = '1' or DMA_WRITE_PEND = '1') else '0';
+	ADRAM_WE <= '1' when DRAM_SLOT = SLOT_WRITE and (ADPCM_WRITE_PEND = '1' or DMA_WRITE_PEND = '1') else '0';
+	ADRAM_RD <= '1' when DRAM_SLOT = SLOT_READ else '0';
+	ADRAM_CLKEN <= DRAM_CLKEN;
 
-	
 	process( RST_N, CLK )
 	begin
 		if RST_N = '0' then
