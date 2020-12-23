@@ -4,6 +4,9 @@ use ieee.numeric_std.all;
 library work;
 
 entity HUC6270 is
+	generic(
+		MAX_SPRITES : integer := 64
+	);
 	port( 
 		CLK		: in std_logic;
 		RST_N		: in std_logic;
@@ -228,7 +231,7 @@ architecture rtl of HUC6270 is
 		TOP    	: std_logic;
 		BOTTOM   : std_logic;
 	end record;
-	type SpriteCache_t is array (0 to 63) of Sprite_r;
+	type SpriteCache_t is array (0 to MAX_SPRITES-1) of Sprite_r;
 	signal SPR_CACHE		: SpriteCache_t;
 	signal SPR				: Sprite_r;
 	signal SPR_EVAL 		: std_logic;
@@ -247,7 +250,7 @@ architecture rtl of HUC6270 is
 	signal SPR_OUT_X		: unsigned(9 downto 0);
 
 	signal SPR_CE			: std_logic;
-	signal SPR_MAX			: integer range 0 to 63;
+	signal SPR_MAX			: integer range 0 to MAX_SPRITES-1;
 	signal FETCH_DOT		: unsigned(2 downto 0);
 	signal FETCH_CE		: std_logic;
 	signal FDOT_CNT		: unsigned(2 downto 0);
@@ -266,13 +269,14 @@ architecture rtl of HUC6270 is
 	signal SPR_TILE_TOP 	: std_logic;
 	signal SPR_TILE_BOTTOM: std_logic;
 	signal SPR_TILE_SAVE : std_logic;
-	signal SPR_TILE_PIX_SET  : std_logic_vector(559 downto 0);
-	signal SPR_TILE_SPR0_SET : std_logic_vector(559 downto 0);
 	signal SPR_TILE_FRAME    : std_logic_vector(559 downto 0);
-	type bufArray_t is array (0 to 1) of std_logic_vector(8 downto 0);
-	signal SPR_LINE_ADDR	: bufArray_t; 
-	signal SPR_LINE_D		: bufArray_t; 
-	signal SPR_LINE_Q		: bufArray_t; 
+	type bufAddrArray_t is array (0 to 1) of std_logic_vector(8 downto 0);
+	type bufDataArray_t is array (0 to 1) of std_logic_vector(9 downto 0);
+	signal SPR_LINE_WR_ADDR     : bufAddrArray_t;
+	signal SPR_LINE_ADDR        : bufAddrArray_t;
+	signal SPR_LINE_RENDER_ADDR : bufAddrArray_t;
+	signal SPR_LINE_D           : bufDataArray_t;
+	signal SPR_LINE_Q           : bufDataArray_t;
 	signal SPR_LINE_WE 	: std_logic_vector(1 downto 0);
 	signal SPR_LINE_CLR 	: std_logic;
 	type SPColorArray_t is array (0 to 7) of std_logic_vector(8 downto 0);
@@ -927,47 +931,63 @@ begin
 	variable SPR_LINE_X : unsigned(9 downto 0);
 	variable N : unsigned(3 downto 0);
 	variable SPR_TILE_PIX : unsigned(3 downto 0);
+	variable RENDER_STATE : integer range 0 to 2;
 	
 	begin
 		if RST_N = '0' then
 			SPR_TILE_PIX := (others=>'0');
 			SPR_LINE_WE <= (others=>'0');
-			SPR_TILE_PIX_SET <= (others=>'0');
-			SPR_TILE_SPR0_SET <= (others=>'0');
 			SPR_OUT_X <= (others=>'0');
 			SPR_LINE_CLR <= '0';
 			IRQ_COL <= '0';
+			RENDER_STATE := 0;
 		elsif rising_edge(CLK) then
 			SPR_LINE_WE <= (others=>'0');
-			if SPR_TILE_SAVE = '1' or SPR_TILE_PIX /= 0 then
-				for i in 0 to 1 loop
-					N := SPR_TILE_PIX xor (3 downto 0 => not SPR_TILE_HF);
-					COLOR := SPR_TILE_P3(to_integer(N)) & SPR_TILE_P2(to_integer(N)) & SPR_TILE_P1(to_integer(N)) & SPR_TILE_P0(to_integer(N));
-					SPR_LINE_X := SPR_TILE_X + SPR_TILE_PIX;
-					if SPR_LINE_X(9 downto 8) /= "11" and COLOR /= "0000" then
-						if SPR_TILE_PIX_SET(to_integer(SPR_LINE_X)) = '0' then
-							SPR_LINE_D(to_integer(SPR_LINE_X(0 downto 0))) <= SPR_TILE_PRIO & SPR_TILE_PAL & COLOR;
-							SPR_LINE_ADDR(to_integer(SPR_LINE_X(0 downto 0))) <= std_logic_vector(SPR_LINE_X(9 downto 1));
-							SPR_LINE_WE(to_integer(SPR_LINE_X(0 downto 0))) <= '1';
-							SPR_TILE_PIX_SET(to_integer(SPR_LINE_X)) <= '1';
-							SPR_TILE_SPR0_SET(to_integer(SPR_LINE_X)) <= SPR_TILE_SPR0;
-						end if;
-						if SPR_TILE_SPR0_SET(to_integer(SPR_LINE_X)) = '1' then
-							if CR_IE_CC = '1' then
-								IRQ_COL <= '1';
-							end if;
-						end if; 
+			case RENDER_STATE is
+				when 0 => -- line buffer address setup
+					if SPR_TILE_SAVE = '1' then
+						RENDER_STATE := 1;
+						SPR_TILE_PIX := (others => '0');
+						SPR_LINE_X := SPR_TILE_X;
+						SPR_LINE_RENDER_ADDR(to_integer(SPR_LINE_X(0 downto 0))) <= std_logic_vector(SPR_LINE_X(9 downto 1));
+						SPR_LINE_X := SPR_LINE_X + 1;
+						SPR_LINE_RENDER_ADDR(to_integer(SPR_LINE_X(0 downto 0))) <= std_logic_vector(SPR_LINE_X(9 downto 1));
 					end if;
+				when 1 => -- wait
+					RENDER_STATE := 2;
+				when 2 => -- check collision/write pixel to line buffer
+					for i in 0 to 1 loop
+						N := SPR_TILE_PIX xor (3 downto 0 => not SPR_TILE_HF);
+						COLOR := SPR_TILE_P3(to_integer(N)) & SPR_TILE_P2(to_integer(N)) & SPR_TILE_P1(to_integer(N)) & SPR_TILE_P0(to_integer(N));
+						SPR_LINE_X := SPR_TILE_X + SPR_TILE_PIX;
+						if SPR_LINE_X(9 downto 8) /= "11" and COLOR /= "0000" then
+							if SPR_LINE_Q(to_integer(SPR_LINE_X(0 downto 0)))(3 downto 0) = "0000" then
+								SPR_LINE_WR_ADDR(to_integer(SPR_LINE_X(0 downto 0))) <= std_logic_vector(SPR_LINE_X(9 downto 1));
+								SPR_LINE_D(to_integer(SPR_LINE_X(0 downto 0))) <= SPR_TILE_SPR0 & SPR_TILE_PRIO & SPR_TILE_PAL & COLOR;
+								SPR_LINE_WE(to_integer(SPR_LINE_X(0 downto 0))) <= '1';
+							end if;
+							if SPR_LINE_Q(to_integer(SPR_LINE_X(0 downto 0)))(9) = '1' then -- SPR0
+								if CR_IE_CC = '1' then
+									IRQ_COL <= '1';
+								end if;
+							end if; 
+						end if;
 
-					if (SPR_TILE_PIX = 0 and SPR_TILE_LEFT = '1') or (SPR_TILE_PIX = 15 and SPR_TILE_RIGTH = '1') or 
-						SPR_TILE_TOP = '1' or SPR_TILE_BOTTOM = '1' then
-						SPR_TILE_FRAME(to_integer(SPR_LINE_X)) <= '1';
-					end if; 
+						if (SPR_TILE_PIX = 0 and SPR_TILE_LEFT = '1') or (SPR_TILE_PIX = 15 and SPR_TILE_RIGTH = '1') or 
+							SPR_TILE_TOP = '1' or SPR_TILE_BOTTOM = '1' then
+							SPR_TILE_FRAME(to_integer(SPR_LINE_X)) <= '1'; -- lot of registers, but will optimized out if not debugging
+						end if;
 
-					SPR_TILE_PIX := SPR_TILE_PIX + 1;
-				end loop;
-			end if; 
-			
+						SPR_LINE_RENDER_ADDR(to_integer(SPR_LINE_X(0 downto 0))) <= std_logic_vector(SPR_LINE_X(9 downto 1) + 1);
+						SPR_TILE_PIX := SPR_TILE_PIX + 1;
+					end loop;
+					if SPR_TILE_PIX = 0 then
+						RENDER_STATE := 0;
+					else
+						RENDER_STATE := 1;
+					end if;
+			end case;
+
 			if DCK_CE = '1' then
 				if TILE_CNT = HDS_END_POS and DOT_CNT = 7 then
 					SPR_OUT_X <= (others=>'0');
@@ -975,43 +995,44 @@ begin
 				elsif TILE_CNT = HDISP_END_POS and DOT_CNT = 7 then
 					SPR_LINE_CLR <= '0';
 				end if;
-				
+
 				if SPR_LINE_CLR = '1' then
-					SPR_TILE_PIX_SET(to_integer(SPR_OUT_X)) <= '0';
-					SPR_TILE_SPR0_SET(to_integer(SPR_OUT_X)) <= '0';
 					SPR_TILE_FRAME(to_integer(SPR_OUT_X)) <= '0';
 					SPR_OUT_X <= SPR_OUT_X + 1;
 				end if;
 			end if;
-			
+
 			if A = "00" and CS_N = '0' and RD_N = '0' and CPU_CE = '1' then
 				IRQ_COL <= '0';
 			end if; 
 		end if;
 	end process;
+
+	SPR_LINE_ADDR(0) <= std_logic_vector(SPR_OUT_X(9 downto 1)) when SPR_LINE_CLR = '1' else SPR_LINE_RENDER_ADDR(0);
+	SPR_LINE_ADDR(1) <= std_logic_vector(SPR_OUT_X(9 downto 1)) when SPR_LINE_CLR = '1' else SPR_LINE_RENDER_ADDR(1);
 	
-	SPR_LINE_BUF0 : entity work.dpram generic map (9,9)
+	SPR_LINE_BUF0 : entity work.dpram generic map (9,10)
 	port map(
 		clock		=> CLK,
 
-		address_a=> SPR_LINE_ADDR(0),
+		address_a=> SPR_LINE_WR_ADDR(0),
 		data_a	=> SPR_LINE_D(0),
 		wren_a	=> SPR_LINE_WE(0),
 
-		address_b=> std_logic_vector(SPR_OUT_X(9 downto 1)),
+		address_b=> SPR_LINE_ADDR(0),
 		wren_b	=> SPR_LINE_CLR and DCK_CE and not SPR_OUT_X(0),
 		q_b		=> SPR_LINE_Q(0)
 	);
 	
-	SPR_LINE_BUF1 : entity work.dpram generic map (9,9)
+	SPR_LINE_BUF1 : entity work.dpram generic map (9,10)
 	port map(
 		clock		=> CLK,
 
-		address_a=> SPR_LINE_ADDR(1),
+		address_a=> SPR_LINE_WR_ADDR(1),
 		data_a	=> SPR_LINE_D(1),
 		wren_a	=> SPR_LINE_WE(1),
 
-		address_b=> std_logic_vector(SPR_OUT_X(9 downto 1)),
+		address_b=> SPR_LINE_ADDR(1),
 		wren_b	=> SPR_LINE_CLR and DCK_CE and SPR_OUT_X(0),
 		q_b		=> SPR_LINE_Q(1)
 	);
@@ -1045,7 +1066,7 @@ begin
 										BG_SR2(to_integer(PX(3 downto 0))) & 
 										BG_SR1(to_integer(PX(3 downto 0))) & 
 										BG_SR0(to_integer(PX(3 downto 0)));
-					SPR_COLOR(7) <= SPR_LINE_Q(to_integer(SPR_OUT_X(0 downto 0)));
+					SPR_COLOR(7) <= SPR_LINE_Q(to_integer(SPR_OUT_X(0 downto 0)))(8 downto 0);
 					DISP(7) <= not BURST;
 					BORD(7) <= '0';
 					
