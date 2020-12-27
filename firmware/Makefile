@@ -9,7 +9,7 @@ LD=../EightThirtyTwo/832a/832l
 DUMP=objdump
 CFLAGS = -+ -size
 COPT = -O=1311
-all: MiSTWrapper_ROM.vhd
+all: controller_rom.vhd
 
 clean :
 	-rm *.asm
@@ -19,10 +19,10 @@ clean :
 	-rm *.bin
 	-rm *.elf
 
-%_ROM.vhd: %.bin $(ROMGEN)
-	sed 's/dualportram/$*_rom/' >$*_ROM.vhd <$(ROMGENDIR)/rom_prologue.vhd
-	$(ROMGEN) -b $*.bin >>$*_ROM.vhd
-	cat >>$*_ROM.vhd $(ROMGENDIR)/rom_epilogue.vhd
+%_rom.vhd: %.bin $(ROMGEN)
+	sed 's/dualportram/$*_rom/' >$*_rom.vhd <$(ROMGENDIR)/rom_prologue.vhd
+	$(ROMGEN) -b $*.bin >>$*_rom.vhd
+	cat >>$*_rom.vhd $(ROMGENDIR)/rom_epilogue.vhd
 
 %.bin : %.elf Makefile
 	objcopy -Obinary $< $@
@@ -30,7 +30,7 @@ clean :
 %.o : %.s Makefile
 	gcc -c $*.s
 
-MiSTWrapper.bin : start.o uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o
+controller.bin : start.o uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o
 	$(LD) -o $@ $+
 
 %.o : %.S Makefile $(832DIR)/start.S
