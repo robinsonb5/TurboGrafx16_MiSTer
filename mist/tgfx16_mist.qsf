@@ -20,7 +20,7 @@
 set_global_assignment -name TOP_LEVEL_ENTITY TGFX16_MIST_TOP
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 5.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "22:49:11  JANUARY 31, 2006"
-set_global_assignment -name LAST_QUARTUS_VERSION "13.1 SP4.26"
+set_global_assignment -name LAST_QUARTUS_VERSION "13.0 SP1"
 
 
 # Pin & Location Assignments
@@ -86,9 +86,6 @@ set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name DEVICE_FILTER_PACKAGE TQFP
 
-set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
-set_global_assignment -name ENABLE_NCE_PIN OFF
-set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
 set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 
@@ -300,23 +297,10 @@ set_global_assignment -name PRE_MAPPING_RESYNTHESIS ON
 set_location_assignment PIN_54 -to CLOCK_27
 set_global_assignment -name SDC_FILE tgfx16_mist.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE TGFX16_MiST.sv
-set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
-set_global_assignment -name VERILOG_FILE data_io.v
-set_global_assignment -name VERILOG_FILE hybrid_pwm_sd.v
+set_global_assignment -name QIP_FILE ../rtl_nosoc/common_nosoc.qip
 set_global_assignment -name QIP_FILE "mist-modules/mist_core.qip"
 set_global_assignment -name QIP_FILE pll.qip
-set_global_assignment -name VHDL_FILE ../rtl/pce_top_extram.vhd
-set_global_assignment -name VHDL_FILE ../rtl/dpram.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/mb128.sv
-set_global_assignment -name VHDL_FILE ../rtl/huc6270.vhd
-set_global_assignment -name VHDL_FILE ../rtl/huc6260.vhd
-set_global_assignment -name VHDL_FILE ../rtl/huc6202.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/color_mix.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cheatcodes.sv
-set_global_assignment -name VHDL_FILE ../rtl/CEGen.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/arcade.sv
-set_global_assignment -name QIP_FILE ../rtl/HUC6280/HUC6280.qip
-set_global_assignment -name QIP_FILE ../rtl/cd/cd.qip
+set_global_assignment -name QIP_FILE ../rtl/turbografx16_common.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/ram.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/dio.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/cpu.stp
@@ -326,4 +310,5 @@ set_global_assignment -name CDF_FILE output_files/tgfx16_mist.cdf
 set_global_assignment -name SIGNALTAP_FILE output_files/rom.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/vdc.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/spr.stp
+
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

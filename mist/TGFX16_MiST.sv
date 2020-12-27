@@ -589,21 +589,15 @@ mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
 wire signed [16:0] audioL = psg_sl + cdda_sl + adpcm_s;
 wire signed [16:0] audioR = psg_sr + cdda_sr + adpcm_s;
 
-hybrid_pwm_sd dacl
+hybrid_pwm_sd_stereo dac
 (
 	.clk(clk_sys),
-	.n_reset(~reset),
-	.din({~audioL[16], audioL[15:1]}),
-	.dout(AUDIO_L)
+	.d_l({~audioL[16], audioL[15:1]}),
+	.d_r({~audioR[16], audioR[15:1]}),
+	.q_l(AUDIO_L),
+	.q_r(AUDIO_R)
 );
 
-hybrid_pwm_sd dacr
-(
-	.clk(clk_sys),
-	.n_reset(~reset),
-	.din({~audioR[16], audioR[15:1]}),
-	.dout(AUDIO_R)
-);
 
 ////////////////////////////  INPUT  ///////////////////////////////////
 wire [31:0] joy_0 = joy_swap ? joy_b : joy_a;
