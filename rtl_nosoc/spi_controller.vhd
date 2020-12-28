@@ -17,7 +17,7 @@ entity spi_controller is
 		-- Host interface
 		spiclk_in : in std_logic;	-- Momentary high pulse
 		host_to_spi : in std_logic_vector(7 downto 0);
-		spi_to_host : out std_logic_vector(31 downto 0);
+		spi_to_host : out std_logic_vector(7 downto 0);
 		trigger : in std_logic;  -- Momentary high pulse
 		busy : buffer std_logic;
 
@@ -39,7 +39,7 @@ begin
 -----------------------------------------------------------------	
 	spiclk_out <= sck;
 	busy <= shiftcnt(5) or trigger;
-   spi_to_host <= X"000000"&sd_shift;
+   spi_to_host <= sd_shift;
 
 	PROCESS (sysclk, reset) BEGIN
 

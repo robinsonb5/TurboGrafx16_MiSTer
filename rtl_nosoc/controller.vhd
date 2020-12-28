@@ -5,6 +5,7 @@ use work.rom_pkg.ALL;
 
 entity controller is
 	generic (
+		debug : boolean := false;
 		sysclk_frequency : integer := 1000 -- Sysclk frequency * 10
 	);
 	port (
@@ -61,8 +62,7 @@ signal spi_cs_int : std_logic;
 
 -- SPI signals
 signal host_to_spi : std_logic_vector(7 downto 0);
-signal spi_to_host : std_logic_vector(31 downto 0);
-signal spi_wide : std_logic;
+signal spi_to_host : std_logic_vector(7 downto 0);
 signal spi_trigger : std_logic;
 signal spi_busy : std_logic;
 signal spi_active : std_logic;
@@ -149,6 +149,13 @@ signal upload_ack : std_logic;
 signal to_rom : ToROM;
 signal from_rom : FromROM;
 
+-- CPU Debug signals
+signal debug_req : std_logic;
+signal debug_ack : std_logic;
+signal debug_fromcpu : std_logic_vector(31 downto 0);
+signal debug_tocpu : std_logic_vector(31 downto 0);
+signal debug_wr : std_logic;
+
 begin
 
 -- Reset counter.
@@ -166,6 +173,7 @@ begin
 	end if;
 end process;
 
+reset_out<=reset_n;
 
 -- Timer
 process(clk)
@@ -256,7 +264,7 @@ begin
 	if rising_edge(clk) then
 		spiclk_in<='0';
 		spi_tick<=spi_tick+1;
-		if (spi_fast='1' and spi_tick(4)='1') or spi_tick(7)='1' then
+		if (spi_fast='1' and spi_tick(3)='1') or spi_tick(6)='1' then
 			spiclk_in<='1'; -- Momentary pulse for SPI host.
 			spi_tick<='0'&X"00";
 		end if;
@@ -328,7 +336,7 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 
 	rom : entity work.controller_rom
 	generic map(
-		maxAddrBitBRAM => 13
+		maxAddrBitBRAM => 12
 	)
 	port map(
 		clk => clk,
@@ -352,7 +360,7 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 		if rising_edge(clk) then
 			rom_ack<=cpu_req and mem_rom;
 
-			if mem_rom='1' then
+			if mem_rom='1' and cpu_req='1' then
 				to_cpu<=from_rom.MemARead;
 			else
 				to_cpu<=from_mem;
@@ -379,7 +387,8 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 		littleendian => true,
 		dualthread => false,
 		prefetch => true,
-		interrupts => true
+		interrupts => true,
+		debug => debug
 	)
 	port map
 	(
@@ -395,9 +404,26 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 		bytesel => cpu_bytesel,
 		wr => cpu_wr,
 		req => cpu_req,
-		ack => cpu_ack
+		ack => cpu_ack,
+		-- Debug signals
+		debug_d=>debug_tocpu,
+		debug_q=>debug_fromcpu,
+		debug_req=>debug_req,
+		debug_wr=>debug_wr,
+		debug_ack=>debug_ack		
 	);
 
+	debugbridge : entity work.debug_bridge_jtag
+	port map
+	(
+		clk => clk,
+		reset_n => reset_n,
+		d => debug_fromcpu,
+		q => debug_tocpu,
+		req => debug_req,
+		ack => debug_ack,
+		wr => debug_wr
+	);
 
 
 process(clk)
@@ -472,13 +498,11 @@ begin
 							mem_busy<='0';
 
 						when X"D4" => -- SPI Data
-							spi_wide<='0';
 							spi_trigger<='1';
 							host_to_spi<=from_cpu(7 downto 0);
 							spi_active<='1';
 						
-						when X"D8" => -- SPI Pump (32-bit read)
-							spi_wide<='1';
+						when X"D8" => -- SPI Pump
 							spi_trigger<='1';
 							host_to_spi<=from_cpu(7 downto 0);
 							spi_active<='1';
@@ -541,11 +565,10 @@ begin
 						when X"D4" => -- SPI read (blocking)
 							spi_active<='1';
 
-						when X"D8" => -- SPI wide read (blocking)
-							spi_wide<='1';
+						when X"D8" => -- SPI pump (blocking)
 							spi_trigger<='1';
-							spi_active<='1';
 							host_to_spi<=X"FF";
+							spi_active<='1';
 
 						-- Read from PS/2 regs
 						when X"E0" =>
@@ -573,7 +596,7 @@ begin
 		-- SPI cycles
 
 		if spi_active='1' and spi_busy='0' then
-			from_mem<=spi_to_host;
+			from_mem<=X"000000"&spi_to_host;
 			spi_active<='0';
 			mem_busy<='0';
 		end if;

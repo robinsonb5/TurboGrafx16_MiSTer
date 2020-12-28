@@ -31,7 +31,7 @@ clean :
 	gcc -c $*.s
 
 controller.bin : start.o uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o
-	$(LD) -o $@ $+
+	$(LD) -o $@ -M controller.map $+
 
 %.o : %.S Makefile $(832DIR)/start.S
 	$(AS) -o $*.o $*.S

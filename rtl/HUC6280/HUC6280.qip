@@ -6,5 +6,5 @@ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) HUC6280_AL
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) HUC6280_AG.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) AddSubBCD.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) psg.vhd ]
-
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) psg_mixer.vhd ]
 

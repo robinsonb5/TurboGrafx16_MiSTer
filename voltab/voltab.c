@@ -3,12 +3,15 @@
 #include <string.h>
 #include <math.h>
 
-#define BRAM_WIDTH 24
-
 int main(int argc, char **argv)
 {	
 	FILE *fp;
 	int i, j;
+	int BRAM_WIDTH=0;
+	if(argc==2)
+		BRAM_WIDTH=atoi(argv[1]);
+	if(!BRAM_WIDTH)
+		BRAM_WIDTH=24;	
 	
 	//long voltab[32][32*3];
 	long voltab[32][128];
@@ -35,7 +38,7 @@ int main(int argc, char **argv)
 	}
 	
 	int a = 0;
-	fp = fopen("voltab.mif","wb");
+	fp = fopen("voltab_out.mif","wb");
 	fprintf(fp, "WIDTH = %d;\n", BRAM_WIDTH);
 	fprintf(fp, "DEPTH = 4096;\n");
 	fprintf(fp, "ADDRESS_RADIX = HEX;\n");
