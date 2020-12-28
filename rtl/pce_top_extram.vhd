@@ -290,7 +290,7 @@ end generate;
 CPU : entity work.HUC6280
 generic map (
 	PSG_O_WIDTH => PSG_O_WIDTH,
-	VOLTAB_FILE => "../voltab/voltab_16.mif"
+	VOLTAB_FILE => "../voltab/voltab_small.mif"
 )
 port map(
 	CLK 		=> CLK,

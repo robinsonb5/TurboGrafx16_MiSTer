@@ -78,18 +78,16 @@ type chanarray_t is array(0 to 5) of chan_t;
 signal CH		: chanarray_t;
 
 -- Channels mixing
-signal LACC		: std_logic_vector(O_WIDTH-1 downto 0);
-signal RACC		: std_logic_vector(O_WIDTH-1 downto 0);
-
-signal VT_ADDR	: std_logic_vector(11 downto 0);
-signal VT_DATA	: std_logic_vector(O_WIDTH-1 downto 0);
 
 type mix_t is ( MIX_WAIT, MIX_NEXT, MIX_LREAD, MIX_LNEXT, MIX_RREAD, MIX_RNEXT, MIX_END );
 signal MIX		: mix_t;
 signal MIX_CNT	: std_logic_vector(2 downto 0);
 
-signal LDATA_FF	: std_logic_vector(O_WIDTH-1 downto 0);
-signal RDATA_FF	: std_logic_vector(O_WIDTH-1 downto 0);
+signal mix_req : std_logic;
+signal mix_sample : std_logic_vector(4 downto 0);
+signal mix_atn : std_logic_vector(6 downto 0);
+signal mix_l_stb : std_logic;
+signal mix_r_stb : std_logic;
 
 begin
 
@@ -298,51 +296,45 @@ begin
 	end if;
 end process;
 
--- Channels mixing
-VT : entity work.dpram generic map (12,O_WIDTH,VOLTAB_FILE)
-port map (
-	clock		=> CLK,
-	address_a=> VT_ADDR,
-	q_a		=> VT_DATA
-);
 
 process( CLK )
 begin
 	if rising_edge( CLK ) then
 		if RESET_N = '0' then
-			LDATA_FF <= (others => '0');
-			RDATA_FF <= (others => '0');
+			mix_req<='0';
+			mix_l_stb<='0';
+			mix_r_stb<='0';
 			MIX <= MIX_WAIT;
 		else
+			mix_sample<=CH(conv_integer(MIX_CNT)).GL_OUT;
+			mix_l_stb<='0';
+			mix_r_stb<='0';
+
 			case MIX is
 			when MIX_WAIT =>
-				LACC <= (others => '0');
-				RACC <= (others => '0');
 				MIX_CNT <= (others => '0');
-				VT_ADDR <= (others => '1');
 				if DAC_LATCH = '1' then
+					mix_req<='1';
 					MIX <= MIX_NEXT;
 				end if;
 
 			when MIX_NEXT =>
-				VT_ADDR <= CH(conv_integer(MIX_CNT)).GL_OUT
-					& ( "1011101" - CH(conv_integer(MIX_CNT)).AL - (CH(conv_integer(MIX_CNT)).LAL & "1") - (LMAL & "1") );
+				mix_atn<=( "1011101" - CH(conv_integer(MIX_CNT)).AL - (CH(conv_integer(MIX_CNT)).LAL & "1") - (LMAL & "1") );
+				mix_l_stb<=CH(conv_integer(MIX_CNT)).CHON;
 				MIX <= MIX_LREAD;
 
 			when MIX_LREAD =>
 				MIX <= MIX_LNEXT;
 
 			when MIX_LNEXT =>
-				LACC <= LACC + VT_DATA;
-				VT_ADDR <= CH(conv_integer(MIX_CNT)).GL_OUT
-					& ( "1011101" - CH(conv_integer(MIX_CNT)).AL - (CH(conv_integer(MIX_CNT)).RAL & "1") - (RMAL & "1") );
+				mix_atn<=( "1011101" - CH(conv_integer(MIX_CNT)).AL - (CH(conv_integer(MIX_CNT)).RAL & "1") - (RMAL & "1") );
+				mix_r_stb<=CH(conv_integer(MIX_CNT)).CHON;
 				MIX <= MIX_RREAD;
 
 			when MIX_RREAD =>
 				MIX <= MIX_RNEXT;
 
 			when MIX_RNEXT =>
-				RACC <= RACC + VT_DATA;
 				if MIX_CNT = "101" then
 					MIX <= MIX_END;
 				else
@@ -351,8 +343,7 @@ begin
 				end if;
 
 			when MIX_END =>
-				LDATA_FF <= LACC;
-				RDATA_FF <= RACC;
+				mix_req<='0';
 				MIX <= MIX_WAIT;
 
 			when others => null;
@@ -361,8 +352,25 @@ begin
 	end if;
 end process;
 
-LDATA <= LDATA_FF;
-RDATA <= RDATA_FF;
+
+-- Multiplier-based channel mixing
+psgmix : entity work.psg_mixer
+generic map (
+	O_WIDTH => O_WIDTH,
+	VOLTAB_FILE => VOLTAB_FILE
+)
+port map (
+	CLK		=> CLK,
+	RESET_N => RESET_N,
+		REQ => mix_req,
+	SAMPLE => mix_sample,
+	ATTENUATION => mix_atn,
+	LEFT_STB => mix_l_stb,
+	RIGHT_STB => mix_r_stb,
+
+	LDATA => LDATA,
+	RDATA => RDATA
+);
 
 end rtl;
 
