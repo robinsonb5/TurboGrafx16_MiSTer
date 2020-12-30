@@ -1,14 +1,23 @@
-832DIR=../EightThirtyTwo/Lib/
-INCDIR=../EightThirtyTwo/include/
-LIBDIR=../Lib/
-ROMGENDIR = ../EightThirtyTwo/romgen
-ROMGEN = $(ROMGENDIR)/romgen
+832DIR=../EightThirtyTwo/
 CC=../EightThirtyTwo/vbcc/bin/vbcc832
 AS=../EightThirtyTwo/832a/832a
 LD=../EightThirtyTwo/832a/832l
 DUMP=objdump
-CFLAGS = -+ -size
-COPT = -O=1311
+INCDIR=../EightThirtyTwo/include/
+LIBDIR=$(832DIR)/lib832
+
+CFLAGS = -+ -O=1311 -size
+ASFLAGS = -el
+LDFLAGS  = -el -s_STACKSIZE=0x0 -s_STACKTOP=0x2000
+
+START = $(LIBDIR)/crt0.a
+LIBS = $(LIBDIR)/lib832.a
+
+PRJ_OBJ = uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o interrupts.o ps2.o keyboard.o userio.o
+
+ROMGENDIR = ../EightThirtyTwo/romgen
+ROMGEN = $(ROMGENDIR)/romgen
+
 all: controller_rom.vhd
 
 clean :
@@ -23,34 +32,17 @@ clean :
 	sed 's/dualportram/$*_rom/' >$*_rom.vhd <$(ROMGENDIR)/rom_prologue.vhd
 	$(ROMGEN) -b $*.bin >>$*_rom.vhd
 	cat >>$*_rom.vhd $(ROMGENDIR)/rom_epilogue.vhd
+	grep __bss_ $*.map
 
-%.bin : %.elf Makefile
-	objcopy -Obinary $< $@
+controller.bin : $(START) $(LIBS) $(PRJ_OBJ)
+	$(LD) $(LDFLAGS) -o $@ -M controller.map $+
 
-%.o : %.s Makefile
-	gcc -c $*.s
-
-controller.bin : start.o uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o
-	$(LD) -o $@ -M controller.map $+
-
-%.o : %.S Makefile $(832DIR)/start.S
-	$(AS) -o $*.o $*.S
-
-%.o : %.c Makefile $(832DIR)/start.S
+%.o : %.c Makefile
 	$(CC) $(COPT) $(CFLAGS) -I$(INCDIR) -I$(LIBDIR) $*.c
-	$(AS) -o $*.o $*.asm
-
-%.o : $(832DIR)/%.S Makefile $(832DIR)/assembler.pp $(832DIR)/start.S
-	$(AS) -o $*.o $(832DIR)/$*.S
-
-%.o : $(832DIR)/%.asm Makefile $(832DIR)/assembler.pp $(832DIR)/start.S
-	$(AS) -o $*.o $(832DIR)/$*.asm
-
-%.o : $(LIBDIR)/%.S Makefile 
-	$(AS) -o $*.o $(LIBDIR)/$*.S
+	$(AS) $(ASFLAGS) -o $*.o $*.asm
 
 %.o : $(LIBDIR)/%.asm Makefile 
-	$(AS) -o $*.o $(LIBDIR)/$*.asm
+	$(AS) $(ASFLAGS) -o $*.o $(LIBDIR)/$*.asm
 
 %.asm : %.c Makefile
 	$(CC) $(COPT) $(CFLAGS) -I$(INCDIR) -I$(LIBDIR) $*.c

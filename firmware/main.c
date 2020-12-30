@@ -8,6 +8,11 @@
 #include "uart.h"
 #include "spi.h"
 #include "minfat.h"
+#include "interrupts.h"
+#include "keyboard.h"
+#include "ps2.h"
+#include "userio.h"
+
 #include "printf.h"
 
 #define Breadcrumb(x) HW_UART(REG_UART)=x;
@@ -85,10 +90,14 @@ void spin()
 }
 
 char filename[16];
+void setstack();
 int main(int argc,char **argv)
 {
 	int havesd;
 	int i,c;
+	setstack();
+
+	PS2Init();
 
 	puts("Fetching conf string\n");
 	filename[0]=0;
@@ -131,13 +140,45 @@ int main(int argc,char **argv)
 
 	puts("Initializing SD card\n");
 	havesd=spi_init() && FindDrive();
+	printf("Have SD? %d\n",havesd);
 
-	if(havesd && SendFile(filename))
+	EnableInterrupts();
+	while(1)
 	{
-		puts("Done\n");
+		int joy0=0;
+		int joy1=0;
+		HandlePS2RawCodes();
+
+		if(TestKey(KEY_F12))
+		{
+			if(havesd && SendFile(filename))
+			{
+				puts("ROM loaded\n");
+			}
+			else
+				puts("ROM load failed\n");
+		}
+
+		if(TestKey(KEY_UPARROW))
+			joy0=JOY_UP;
+		if(TestKey(KEY_DOWNARROW))
+			joy0|=JOY_DOWN;
+		if(TestKey(KEY_LEFTARROW))
+			joy0|=JOY_LEFT;
+		if(TestKey(KEY_RIGHTARROW))
+			joy0|=JOY_RIGHT;
+		if(TestKey(KEY_RCTRL))
+			joy0|=JOY_BTN1;
+		if(TestKey(KEY_RSHIFT))
+			joy0|=JOY_BTN2;
+		if(TestKey(KEY_ALTGR))
+			joy0|=JOY_BTN3;
+		if(TestKey(KEY_ENTER))
+			joy0|=JOY_BTN4;
+
+		user_io_digital_joystick_ext(0, joy0);
+
 	}
-	else
-		puts("SD boot failed\n");
 
 	return(0);
 }
