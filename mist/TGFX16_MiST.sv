@@ -345,7 +345,8 @@ sdram sdram
 	.*,
 	.init_n(locked),
 	.clk(clk_mem),
-	.clkref(ce_rom),
+	.clkref(ce_vid),
+	.sync_en(dcc==2'b10), // sync only in hires mode
 
 	.rom_addr(rom_addr_sd),
 	.rom_din(ioctl_dout),
@@ -542,6 +543,7 @@ pce_top #(LITE) pce_top
 
 	.ReducedVBL(~overscan),
 	.BORDER_EN(border),
+	.VIDEO_DCC(dcc),
 	.VIDEO_R(r),
 	.VIDEO_G(g),
 	.VIDEO_B(b),
@@ -560,6 +562,7 @@ wire hs,vs;
 wire hbl,vbl;
 wire bw;
 wire ce_vid;
+wire [1:0] dcc;
 
 mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
 (

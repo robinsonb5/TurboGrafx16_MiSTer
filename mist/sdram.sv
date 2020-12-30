@@ -38,6 +38,7 @@ module sdram (
 	input             init_n,     // init signal after FPGA config to initialize RAM
 	input             clk,        // sdram clock
 	input             clkref,
+	input             sync_en,
 
 	input      [15:0] rom_din,
 	output reg [15:0] rom_dout,
@@ -115,38 +116,62 @@ localparam RFRSH_CYCLES = 10'd1000;
 //6           DS1
 //7 DATA0                       CAS2
 
-//CL2
-//0 RAS0
-//1
-//2 CAS0      DATA1
-//3           RAS1
-//4
-//5 DATA0     CAS1
+// 12 cycle state machine to keep in sync with hi-res dotclock
+// 0 RAS0
+// 1
+// 2           RAS1
+// 3 CAS0
+// 4 DS0                         RAS2
+// 5           CAS1
+// 6           DS1
+// 7 DATA0                       CAS2
+// 8                             DS2
+// 9           DATA1
+//10
+//11                             DATA2
 
-localparam STATE_RAS0      = 3'd0;   // first state in cycle
-localparam STATE_RAS1      = 3'd2;   // Second ACTIVE command after RAS0 + tRRD (15ns)
-localparam STATE_RAS2      = 3'd4;   // Third ACTIVE command after RAS0 + tRRD (15ns)
-localparam STATE_CAS0      = STATE_RAS0 + RASCAS_DELAY; // CAS phase - 3
-localparam STATE_CAS1      = STATE_RAS1 + RASCAS_DELAY; // CAS phase - 5
-localparam STATE_CAS2      = STATE_RAS2 + RASCAS_DELAY; // CAS phase - 7
-localparam STATE_DS0       = STATE_CAS0 + 1'd1;
-localparam STATE_READ0     = 3'd0;//STATE_CAS0 + CAS_LATENCY + 1'd1;
-localparam STATE_DS1       = STATE_CAS1 + 1'd1;
-localparam STATE_READ1     = 3'd2;//3'd1;
-localparam STATE_DS2       = 3'd0;
-localparam STATE_READ2     = 3'd4;//3'd3;
-localparam STATE_LAST      = 3'd7;  // last state in cycle
+wire [3:0] STATE_RAS0      = 4'd0;   // first state in cycle
+wire [3:0] STATE_RAS1      = 4'd2;   // Second ACTIVE command after RAS0 + tRRD (15ns)
+wire [3:0] STATE_RAS2      = 4'd4;   // Third ACTIVE command after RAS0 + tRRD (15ns)
+wire [3:0] STATE_CAS0      = STATE_RAS0 + RASCAS_DELAY; // CAS phase - 3
+wire [3:0] STATE_CAS1      = STATE_RAS1 + RASCAS_DELAY; // CAS phase - 5
+wire [3:0] STATE_CAS2      = STATE_RAS2 + RASCAS_DELAY; // CAS phase - 7
+wire [3:0] STATE_DS0       = STATE_CAS0 + 1'd1;
+wire [3:0] STATE_READ0     = {sync_r, 3'd0};        //STATE_CAS0 + CAS_LATENCY + 2'd2;
+wire [3:0] STATE_DS1       = STATE_CAS1 + 1'd1;
+wire [3:0] STATE_READ1     = {sync_r, 3'd2};        //STATE_CAS1 + CAS_LATENCY + 2'd2;
+wire [3:0] STATE_DS2       = {sync_r, 3'd0};        //STATE_CAS2 + 1'd1;
+wire [3:0] STATE_READ2     = {1'b0, ~sync_r, 2'b00 };//? 4'd0 : 4'd4;  //STATE_CAS2 + CAS_LATENCY + 2'd2;
+wire [3:0] STATE_LAST      = {sync_r, ~sync_r, 2'b11};//? 4'd11 : 4'd7; // last state in cycle
 
-reg [2:0] t;
+reg [3:0] t;
+reg       sync_r;
 
 always @(posedge clk) begin
 	reg clkref_d;
 	clkref_d <= clkref;
+	if (t == STATE_RAS0) sync_r <= sync_en;
 
-	t <= t + 1'd1;
-//	if(~clkref_d && clkref && !oe_latch && !we_latch && !refresh && !init) t <= 3'd1;
-	if (t == STATE_RAS2 && next_port[2] == PORT_NONE && !oe_latch && !we_latch && !need_refresh && !init) t <= STATE_RAS0;
+//	t <= t + 1'd1;
 //	if (t == STATE_LAST) t <= STATE_RAS0;
+
+	if (t == STATE_LAST) begin
+		if ((~clkref_d & clkref) | !sync_r) t <= STATE_RAS0;
+	end else case(t)
+		4'h0: t <= 4'h1;
+		4'h1: t <= 4'h2;
+		4'h2: t <= 4'h3;
+		4'h3: t <= 4'h4;
+		4'h4: t <= 4'h5;
+		4'h5: t <= 4'h6;
+		4'h6: t <= 4'h7;
+		4'h7: t <= 4'h8;
+		4'h8: t <= 4'h9;
+		4'h9: t <= 4'ha;
+		4'ha: t <= 4'hb;
+	endcase
+
+	if (t == STATE_RAS2 && next_port[2] == PORT_NONE && !oe_latch && !we_latch && !need_refresh && !init && !sync_r) t <= STATE_RAS0;
 end
 
 // ---------------------------------------------------------------------
