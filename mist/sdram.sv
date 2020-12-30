@@ -150,28 +150,47 @@ reg       sync_r;
 always @(posedge clk) begin
 	reg clkref_d;
 	clkref_d <= clkref;
-	if (t == STATE_RAS0) sync_r <= sync_en;
 
-//	t <= t + 1'd1;
-//	if (t == STATE_LAST) t <= STATE_RAS0;
-
-	if (t == STATE_LAST) begin
-		if ((~clkref_d & clkref) | !sync_r) t <= STATE_RAS0;
-	end else case(t)
-		4'h0: t <= 4'h1;
+	case(t)
+		4'h0: begin // RAS0
+				t <= 4'h1;
+				sync_r <= sync_en;
+				// shortcut if no request is pending
+				if (next_port[0] == PORT_NONE && ~|oe_latch[2:1] && ~|we_latch[2:1] && !refresh && !init && !sync_r) begin
+					if (next_port[1] != PORT_NONE)
+						t <= STATE_RAS1;
+					else if (next_port[2] != PORT_NONE)
+						t <= STATE_RAS2;
+					else
+						t <= STATE_RAS0;
+				end
+			end
 		4'h1: t <= 4'h2;
-		4'h2: t <= 4'h3;
+		4'h2: begin // RAS1
+				t <= 4'h3;
+				// shortcut if no request is pending
+				if (next_port[1] == PORT_NONE && ~oe_latch[0] && ~oe_latch[2] && ~we_latch[0] && ~we_latch[2] && !refresh && !init && !sync_r)
+					t <= STATE_RAS2;
+			end
 		4'h3: t <= 4'h4;
-		4'h4: t <= 4'h5;
+		4'h4: begin // RAS2
+				t <= 4'h5;
+				// shortcut if no request is pending
+				if (next_port[2] == PORT_NONE && ~|oe_latch[1:0] && ~|we_latch[1:0] && !need_refresh && !init && !sync_r)
+					t <= STATE_RAS0;
+			end
 		4'h5: t <= 4'h6;
 		4'h6: t <= 4'h7;
-		4'h7: t <= 4'h8;
+		4'h7: begin // LAST
+				t <= 4'h8;
+				if (!sync_r) t <= STATE_RAS0;
+			end
 		4'h8: t <= 4'h9;
 		4'h9: t <= 4'ha;
 		4'ha: t <= 4'hb;
+		4'hb: if (~clkref_d & clkref) t <= STATE_RAS0;
 	endcase
 
-	if (t == STATE_RAS2 && next_port[2] == PORT_NONE && !oe_latch && !we_latch && !need_refresh && !init && !sync_r) t <= STATE_RAS0;
 end
 
 // ---------------------------------------------------------------------
