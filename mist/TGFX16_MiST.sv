@@ -276,8 +276,6 @@ reg         aram_wr_last;
 wire        aram_req;
 wire        aram_req_reg;
 
-reg         vram_rd_pulse;
-
 reg         ioctl_wr_last;
 
 always @(posedge clk_sys) begin
@@ -304,8 +302,6 @@ always @(posedge clk_sys) begin
 		aram_din <= ARAM_D;
 	end
 
-	vram_rd_pulse <= ce_vid;
-
 end
 
 always @(posedge clk_mem) begin
@@ -319,20 +315,15 @@ always @(posedge clk_mem) begin
 		end
 */
 
-	reg vram_rd_pulse_d;
-	vram_rd_pulse_d <= vram_rd_pulse;
-
 	vram0_weD <= VRAM0_WE;
-//	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
-	if ((~vram0_weD & VRAM0_WE) || (VRAM0_RD & ~vram_rd_pulse_d & vram_rd_pulse)) begin
+	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
 		vram0_addr_sd <= VRAM0_ADDR[15:1];
 		vram0_din <= VRAM0_D;
 		vram0_req <= ~vram0_req;
 	end
 
 	vram1_weD <= VRAM1_WE;
-//	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
-	if ((~vram1_weD & VRAM1_WE) || (VRAM1_RD & ~vram_rd_pulse_d & vram_rd_pulse)) begin
+	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
 		vram1_addr_sd <= VRAM1_ADDR[15:1];
 		vram1_din <= VRAM1_D;
 		vram1_req <= ~vram1_req;
