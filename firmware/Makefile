@@ -1,19 +1,19 @@
 832DIR=../EightThirtyTwo/
-CC=../EightThirtyTwo/vbcc/bin/vbcc832
-AS=../EightThirtyTwo/832a/832a
-LD=../EightThirtyTwo/832a/832l
+CC=$(832DIR)/vbcc/bin/vbcc832
+AS=$(832DIR)/832a/832a
+LD=$(832DIR)/832a/832l
 DUMP=objdump
-INCDIR=../EightThirtyTwo/include/
+INCDIR=$(832DIR)/include/
 LIBDIR=$(832DIR)/lib832
 
 CFLAGS = -+ -O=1311 -size
 ASFLAGS = -el
-LDFLAGS  = -el -s_STACKSIZE=0x0 -s_STACKTOP=0x2000
+LDFLAGS  = -el -s_STACKSIZE=0x300
 
 START = $(LIBDIR)/crt0.a
-LIBS = $(LIBDIR)/lib832.a
+LIBS = $(LIBDIR)/libtiny832.a
 
-PRJ_OBJ = uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o interrupts.o ps2.o keyboard.o userio.o
+PRJ_OBJ = uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o interrupts.o ps2.o keyboard.o userio.o osd.o font.o menu.o
 
 ROMGENDIR = ../EightThirtyTwo/romgen
 ROMGEN = $(ROMGENDIR)/romgen

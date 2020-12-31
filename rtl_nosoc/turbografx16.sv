@@ -18,8 +18,8 @@
 
 module turbografx16
 (
-   input         CLK_SYS,   // 42MHz
-	input         CLK_MEM,   // 126MHz
+   input         clk_sys,   // 42MHz
+	input         clk_mem,   // 126MHz
 	input         RESET_N,
 	
    output  [5:0] VGA_R,
@@ -54,8 +54,10 @@ module turbografx16
    output  [1:0] SDRAM_BA,
    output        SDRAM_CKE
 );
-
+parameter ypbpr_ena = 1;
 localparam LITE = 0;
+
+wire locked = RESET_N;
 
 assign LED  = ~ioctl_download & ~bk_ena;
 
@@ -94,7 +96,7 @@ wire       ac_en = 0;//status[14];
 
 
 reg reset;
-always @(posedge CLK_SYS) begin
+always @(posedge clk_sys) begin
 	reset <= buttons[1] | status[0] | ioctl_download;
 end
 
@@ -137,8 +139,8 @@ wire [31:0] img_size;
 
 user_io #(.STRLEN($size(CONF_STR)>>3)) user_io
 (
-	.clk_sys(CLK_SYS),
-	.clk_sd(CLK_SYS),
+	.clk_sys(clk_sys),
+	.clk_sd(clk_sys),
 	.SPI_SS_IO(CONF_DATA0),
 	.SPI_CLK(SPI_SCK),
 	.SPI_MOSI(SPI_DI),
@@ -179,7 +181,7 @@ user_io #(.STRLEN($size(CONF_STR)>>3)) user_io
 
 data_io data_io
 (
-	.clk_sys(CLK_SYS),
+	.clk_sys(clk_sys),
 	.SPI_SCK(SPI_SCK),
 	.SPI_DI(SPI_DI),
 	.SPI_DO(SPI_DO),
@@ -266,11 +268,9 @@ reg         aram_wr_last;
 wire        aram_req;
 wire        aram_req_reg;
 
-reg         vram_rd_pulse;
-
 reg         ioctl_wr_last;
 
-always @(posedge CLK_SYS) begin
+always @(posedge clk_sys) begin
 
 	ioctl_wr_last <= ioctl_wr;
 
@@ -294,11 +294,9 @@ always @(posedge CLK_SYS) begin
 		aram_din <= ARAM_D;
 	end
 
-	vram_rd_pulse <= ce_vid;
-
 end
 
-always @(posedge CLK_MEM) begin
+always @(posedge clk_mem) begin
 /*
 		bsram_rdD <= bsram_rd;
 		bsram_wrD <= bsram_wr;
@@ -309,20 +307,15 @@ always @(posedge CLK_MEM) begin
 		end
 */
 
-	reg vram_rd_pulse_d;
-	vram_rd_pulse_d <= vram_rd_pulse;
-
 	vram0_weD <= VRAM0_WE;
-//	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
-	if ((~vram0_weD & VRAM0_WE) || (VRAM0_RD & ~vram_rd_pulse_d & vram_rd_pulse)) begin
+	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
 		vram0_addr_sd <= VRAM0_ADDR[15:1];
 		vram0_din <= VRAM0_D;
 		vram0_req <= ~vram0_req;
 	end
 
 	vram1_weD <= VRAM1_WE;
-//	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
-	if ((~vram1_weD & VRAM1_WE) || (VRAM1_RD & ~vram_rd_pulse_d & vram_rd_pulse)) begin
+	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
 		vram1_addr_sd <= VRAM1_ADDR[15:1];
 		vram1_din <= VRAM1_D;
 		vram1_req <= ~vram1_req;
@@ -333,9 +326,10 @@ end
 sdram sdram
 (
 	.*,
-	.init_n(RESET_N),
-	.clk(CLK_MEM),
-	.clkref(ce_rom),
+	.init_n(locked),
+	.clk(clk_mem),
+	.clkref(ce_vid),
+	.sync_en(dcc==2'b10), // sync only in hires mode
 
 	.rom_addr(rom_addr_sd),
 	.rom_din(ioctl_dout),
@@ -395,7 +389,7 @@ assign SDRAM_CKE = 1'b1;
 
 // Populous cart detect
 reg [1:0] populous;
-always @(posedge CLK_SYS) begin
+always @(posedge clk_sys) begin
 	reg old_download;
 
 	old_download <= cart_download;
@@ -420,7 +414,7 @@ wire cart_download   = ioctl_download & (ioctl_index[5:0] <= 6'h01);
 wire cd_dat_download = ioctl_download & (ioctl_index[5:0] == 6'h02);
 
 reg cd_en = 0;
-always @(posedge CLK_SYS) begin
+always @(posedge clk_sys) begin
         if(img_mounted && img_size) cd_en <= 1;
         if(cart_download) cd_en <= 0;
 end
@@ -446,7 +440,7 @@ pce_top #(LITE) pce_top
 (
 	.RESET(reset),
 
-	.CLK(CLK_SYS),
+	.CLK(clk_sys),
 
 	.ROM_RD(ROM_RD),
 	.ROM_RDY((rom_req == rom_req_ack) && (wram_req == wram_req_ack)),
@@ -532,6 +526,7 @@ pce_top #(LITE) pce_top
 
 	.ReducedVBL(~overscan),
 	.BORDER_EN(border),
+	.VIDEO_DCC(dcc),
 	.VIDEO_R(r),
 	.VIDEO_G(g),
 	.VIDEO_B(b),
@@ -550,13 +545,14 @@ wire hs,vs;
 wire hbl,vbl;
 wire bw;
 wire ce_vid;
+wire [1:0] dcc;
 
 mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
 (
-	.clk_sys(CLK_SYS),
+	.clk_sys(clk_sys),
 	.scanlines(scanlines),
 	.scandoubler_disable(scandoubler_disable),
-	.ypbpr(ypbpr),
+	.ypbpr(ypbpr & ypbpr_ena),
 	.no_csync(no_csync),
 	.rotate(2'b00),
 	.ce_divider(1'b1),
@@ -581,7 +577,7 @@ wire signed [16:0] audioR = psg_sr + cdda_sr + adpcm_s;
 
 hybrid_pwm_sd_stereo dac
 (
-	.clk(CLK_SYS),
+	.clk(clk_sys),
 	.d_l({~audioL[16], audioL[15:1]}),
 	.d_r({~audioR[16], audioR[15:1]}),
 	.q_l(AUDIO_L),
@@ -622,7 +618,7 @@ reg [2:0] joy_port;
 reg [1:0] mouse_cnt;
 reg [7:0] ms_x, ms_y;
 
-always @(posedge CLK_SYS) begin : input_block
+always @(posedge clk_sys) begin : input_block
 	reg  [1:0] last_gp;
 	reg        high_buttons;
 	reg [14:0] mouse_to;
@@ -676,7 +672,7 @@ reg  [11:0] sav_size;
 
 assign      sd_buff_din = sd_buff_addr[0] ? bsram_io_q_save[15:8] : bsram_io_q_save[7:0];
 
-always @(posedge CLK_SYS) begin
+always @(posedge clk_sys) begin
 
 	reg img_mountedD;
 	reg ioctl_downloadD;

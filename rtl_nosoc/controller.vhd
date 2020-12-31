@@ -336,7 +336,7 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 
 	rom : entity work.controller_rom
 	generic map(
-		maxAddrBitBRAM => 12
+		maxAddrBitBRAM => 13
 	)
 	port map(
 		clk => clk,

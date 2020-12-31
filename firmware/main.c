@@ -12,6 +12,8 @@
 #include "keyboard.h"
 #include "ps2.h"
 #include "userio.h"
+#include "osd.h"
+#include "menu.h"
 
 #include "printf.h"
 
@@ -23,17 +25,6 @@
 #define HW_UPLOAD(x) *(volatile unsigned int *)(UPLOADBASE+x)
 
 /* Upload data to FPGA */
-
-void SendBlock(const char *buf,int size)
-{
-	SPI_ENABLE(HW_SPI_FPGA|HW_SPI_FAST);
-	SPI(SPI_FPGA_FILE_TX_DAT);
-	while(size--)
-	{
-		SPI(*buf++);
-	}
-	SPI_DISABLE(HW_SPI_FPGA);
-}
 
 fileTYPE file;
 
@@ -52,6 +43,7 @@ int SendFile(const char *fn)
 
 		while(imgsize)
 		{
+			char *buf=sector_buffer;
 			if(!FileRead(&file,sector_buffer))
 				return(0);
 
@@ -65,7 +57,13 @@ int SendFile(const char *fn)
 				sendsize=imgsize;
 				imgsize=0;
 			}
-			SendBlock(sector_buffer,sendsize);
+			SPI_ENABLE(HW_SPI_FPGA|HW_SPI_FAST);
+			SPI(SPI_FPGA_FILE_TX_DAT);
+			while(sendsize--)
+			{
+				SPI(*buf++);
+			}
+			SPI_DISABLE(HW_SPI_FPGA);
 			FileNextSector(&file);
 		}
 		SPI_ENABLE(HW_SPI_FPGA);
@@ -89,13 +87,63 @@ void spin()
 		t=HW_SPI(HW_SPI_CS);
 }
 
+
+
+static void reset(int row)
+{
+	Menu_Hide();
+	// FIXME reset here
+}
+
+
+static void SaveSettings(int row)
+{
+	Menu_Hide();
+	// FIXME reset here
+}
+
+static void MenuHide(int row)
+{
+	Menu_Hide();
+}
+
+static void showrommenu(int row)
+{
+}
+
+
+static char *video_labels[]=
+{
+	"VGA - 31KHz, 60Hz",
+	"TV - 480i, 60Hz"
+};
+
+
+static struct menu_entry topmenu[]=
+{
+	{MENU_ENTRY_CALLBACK,"Reset",MENU_ACTION(&reset)},
+	{MENU_ENTRY_CALLBACK,"Save settings",MENU_ACTION(&SaveSettings)},
+	{MENU_ENTRY_CYCLE,(char *)video_labels,2},
+	{MENU_ENTRY_TOGGLE,"Scanlines",1},
+//	{MENU_ENTRY_CYCLE,(char *)cart_labels,2},
+	{MENU_ENTRY_CALLBACK,"Load ROM \x10",MENU_ACTION(&showrommenu)},
+//	{MENU_ENTRY_CALLBACK,"Debug \x10",MENU_ACTION(&debugmode)},
+	{MENU_ENTRY_CALLBACK,"Exit",MENU_ACTION(&MenuHide)},
+	{MENU_ENTRY_NULL,0,0}
+};
+
+
+
+
+
 char filename[16];
-void setstack();
+//void setstack();
 int main(int argc,char **argv)
 {
 	int havesd;
 	int i,c;
-	setstack();
+	int osd=0;
+//	setstack();
 
 	PS2Init();
 
@@ -142,14 +190,20 @@ int main(int argc,char **argv)
 	havesd=spi_init() && FindDrive();
 	printf("Have SD? %d\n",havesd);
 
+	Menu_Set(topmenu);
+
 	EnableInterrupts();
 	while(1)
 	{
-		int joy0=0;
-		int joy1=0;
 		HandlePS2RawCodes();
 
-		if(TestKey(KEY_F12))
+		if(Menu_Run())
+		{
+			
+
+		}
+
+		if(TestKey(KEY_F11))
 		{
 			if(havesd && SendFile(filename))
 			{
@@ -158,26 +212,6 @@ int main(int argc,char **argv)
 			else
 				puts("ROM load failed\n");
 		}
-
-		if(TestKey(KEY_UPARROW))
-			joy0=JOY_UP;
-		if(TestKey(KEY_DOWNARROW))
-			joy0|=JOY_DOWN;
-		if(TestKey(KEY_LEFTARROW))
-			joy0|=JOY_LEFT;
-		if(TestKey(KEY_RIGHTARROW))
-			joy0|=JOY_RIGHT;
-		if(TestKey(KEY_RCTRL))
-			joy0|=JOY_BTN1;
-		if(TestKey(KEY_RSHIFT))
-			joy0|=JOY_BTN2;
-		if(TestKey(KEY_ALTGR))
-			joy0|=JOY_BTN3;
-		if(TestKey(KEY_ENTER))
-			joy0|=JOY_BTN4;
-
-		user_io_digital_joystick_ext(0, joy0);
-
 	}
 
 	return(0);
