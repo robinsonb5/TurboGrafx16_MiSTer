@@ -6,7 +6,7 @@ DUMP=objdump
 INCDIR=$(832DIR)/include/
 LIBDIR=$(832DIR)/lib832
 
-CFLAGS = -+ -O=1311 -size
+CFLAGS = -+ -O=1311 -size -unsigned-char
 ASFLAGS = -el
 LDFLAGS  = -el -s_STACKSIZE=0x300
 

@@ -109,5 +109,9 @@ unsigned int FileRead(fileTYPE *file, unsigned char *pBuffer);
 
 int LoadFile(const char *fn, unsigned char *buf);
 
+DIRENTRY *NextDirEntry(int prev);
+extern unsigned int dir_entries;             // number of entry's in directory table
+extern char longfilename[260];
+
 #endif
 

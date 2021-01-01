@@ -47,6 +47,7 @@ void Menu_Draw(int currentrow)
 				i=MENU_CYCLE_VALUE(m);	// Access the first byte
 				labels=(char**)m->label;
 				OsdPutChar(FONT_CYCLE);
+				OsdPutChar(' ');
 				OsdPuts(labels[i]);
 				break;
 #if 0
@@ -83,7 +84,9 @@ void Menu_Draw(int currentrow)
 void Menu_Set(struct menu_entry *head)
 {
 	menu=head;
+	Menu_Draw(currentrow);
 	currentrow=menurows-1;
+	Menu_Draw(currentrow);
 }
 
 

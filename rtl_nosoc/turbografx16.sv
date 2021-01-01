@@ -37,6 +37,7 @@ module turbografx16
 
    input         SPI_SCK,
    input         SPI_DI,
+	input         SPI_SD_DI,
    inout         SPI_DO,
    input         SPI_SS2,
    input         SPI_SS3,
@@ -184,7 +185,7 @@ data_io data_io
 	.clk_sys(clk_sys),
 	.SPI_SCK(SPI_SCK),
 	.SPI_DI(SPI_DI),
-	.SPI_DO(SPI_DI),
+	.SPI_DO(SPI_SD_DI),
 	.SPI_SS2(SPI_SS2),
 	.SPI_SS4(SPI_SS4),
 
@@ -329,7 +330,7 @@ sdram sdram
 	.init_n(locked),
 	.clk(clk_mem),
 	.clkref(ce_vid),
-//	.sync_en(dcc==2'b10), // sync only in hires mode
+	.sync_en(dcc==2'b10), // sync only in hires mode
 
 	.rom_addr(rom_addr_sd),
 	.rom_din(ioctl_dout),
@@ -526,7 +527,7 @@ pce_top #(LITE) pce_top
 
 	.ReducedVBL(~overscan),
 	.BORDER_EN(border),
-//	.VIDEO_DCC(dcc),
+	.VIDEO_DCC(dcc),
 	.VIDEO_R(r),
 	.VIDEO_G(g),
 	.VIDEO_B(b),
@@ -546,8 +547,10 @@ wire hbl,vbl;
 wire bw;
 wire ce_vid;
 wire [1:0] dcc;
+wire [2:0] ce_div = dcc == 2'b00 ? 3'd7 :
+		dcc == 2'b01 ? 3'd5 : 3'd3;
 
-mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
+mist_video #(.SD_HCNT_WIDTH(10), .COLOR_DEPTH(3)) mist_video
 (
 	.clk_sys(clk_sys),
 	.scanlines(scanlines),
@@ -555,7 +558,7 @@ mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
 	.ypbpr(ypbpr & ypbpr_ena),
 	.no_csync(no_csync),
 	.rotate(2'b00),
-	.ce_divider(1'b1),
+	.ce_divider(ce_div),
 	.SPI_DI(SPI_DI),
 	.SPI_SCK(SPI_SCK),
 	.SPI_SS3(SPI_SS3),

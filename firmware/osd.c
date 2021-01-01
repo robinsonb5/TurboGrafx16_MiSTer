@@ -60,7 +60,7 @@ void OsdPutChar(unsigned char c)
 
 void OsdPuts(unsigned char *s)
 {
-	char c;
+	unsigned char c;
 	while(c=*s++)
 		OsdPutChar(c);
 }

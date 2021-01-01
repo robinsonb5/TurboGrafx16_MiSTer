@@ -143,6 +143,7 @@ COMPONENT turbografx16
 		SDRAM_BA		:	 OUT STD_LOGIC_VECTOR(1 DOWNTO 0);
 		SDRAM_CKE		:	 OUT STD_LOGIC;
 		SPI_DO		:	 OUT STD_LOGIC;
+		SPI_SD_DI	:	 IN STD_LOGIC;
 		SPI_DI		:	 IN STD_LOGIC;
 		SPI_SCK		:	 IN STD_LOGIC;
 		SPI_SS2		:	 IN STD_LOGIC;
@@ -250,6 +251,7 @@ guest: COMPONENT turbografx16
 		SDRAM_BA => DRAM_BA,
 		SDRAM_CKE => DRAM_CKE,
 		
+		SPI_SD_DI => sd_miso,
 		SPI_DO => spi_fromguest,
 		SPI_DI => spi_toguest,
 		SPI_SCK => spi_clk_int,
