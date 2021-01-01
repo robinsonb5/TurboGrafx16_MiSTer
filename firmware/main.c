@@ -44,7 +44,7 @@ int SendFile(const char *fn)
 		while(imgsize)
 		{
 			char *buf=sector_buffer;
-			if(!FileRead(&file,sector_buffer))
+			if(!FileRead(&file,0))//sector_buffer))
 				return(0);
 
 			if(imgsize>=512)
@@ -57,6 +57,7 @@ int SendFile(const char *fn)
 				sendsize=imgsize;
 				imgsize=0;
 			}
+/*
 			SPI_ENABLE(HW_SPI_FPGA|HW_SPI_FAST);
 			SPI(SPI_FPGA_FILE_TX_DAT);
 			while(sendsize--)
@@ -64,6 +65,7 @@ int SendFile(const char *fn)
 				SPI(*buf++);
 			}
 			SPI_DISABLE(HW_SPI_FPGA);
+*/
 			FileNextSector(&file);
 		}
 		SPI_ENABLE(HW_SPI_FPGA);

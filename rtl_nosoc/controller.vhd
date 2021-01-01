@@ -18,6 +18,7 @@ entity controller is
 		spi_clk		: out std_logic;
 		spi_cs 		: out std_logic;
 		spi_mosi    : out std_logic;
+		spi_toguest : out std_logic;
 		spi_fromguest : in std_logic;
 		spi_ss2 : out std_logic;
 		spi_ss3 : out std_logic;
@@ -68,6 +69,8 @@ signal spi_busy : std_logic;
 signal spi_active : std_logic;
 
 signal spi_fromguest_sd : std_logic;
+signal spi_mosi_int : std_logic;
+signal spi_ss4_int : std_logic;
 
 -- UART signals
 
@@ -287,14 +290,17 @@ spi : entity work.spi_controller
 
 		-- Hardware interface
 		miso => spi_fromguest_sd,
-		mosi => spi_mosi,
+		mosi => spi_mosi_int,
 		spiclk_out => spi_clk
 	);
 
 -- SPI input will be SD card MISO when SPI_CD is low, otherwise the MISO signal from the guest
 spi_cs <= spi_cs_int;
+spi_mosi <= spi_mosi_int;
+spi_ss4 <= spi_ss4_int;
 spi_fromguest_sd <= spi_miso when spi_cs_int='0' else spi_fromguest;
-
+-- For direct mode the sd card MISO signal must be passed to the guest when ss4 is low.
+spi_toguest <= spi_mosi_int when spi_ss4_int='1' else spi_miso;
 	
 mytimer : entity work.timer_controller
   generic map(
@@ -436,7 +442,7 @@ begin
 		spi_cs_int <= '1';
 		spi_ss2 <= '1';
 		spi_ss3 <= '1';
-		spi_ss4 <= '1';
+		spi_ss4_int <= '1';
 		conf_data0 <= '1';
 		uploading<='0';
 		upload_req<='0';
@@ -489,7 +495,7 @@ begin
 								spi_ss3 <= not from_cpu(0);
 							end if;
 							if from_cpu(4)='1' then
-								spi_ss4 <= not from_cpu(0);
+								spi_ss4_int <= not from_cpu(0);
 							end if;
 							if from_cpu(5)='1' then
 								conf_data0 <= not from_cpu(0);

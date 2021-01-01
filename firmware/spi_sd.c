@@ -21,7 +21,7 @@ int sd_size;
 #define cmd_CMD55(x) cmd_write(0xff0077,0)
 #define cmd_CMD58(x) cmd_write(0xff007A,0)
 
-#define SPI_DEBUG
+#undef SPI_DEBUG
 
 #ifdef SPI_DEBUG
 #define DBG(x) puts(x)
@@ -324,8 +324,6 @@ int sd_write_sector(unsigned long lba,unsigned char *buf) // FIXME - Stub
 
 extern void spi_readsector(long *buf);
 
-int spi_checksum;
-
 static int sd_read(unsigned char *buf,int bytes)
 {
 	int result=0;
@@ -334,40 +332,28 @@ static int sd_read(unsigned char *buf,int bytes)
 	{
 		int v;
 		SPI(0xff);
-//		SPI_WAIT();
 		v=SPI_READ();
 		if(v==0xfe)
 		{
-//			puts("Reading sector data\n");
-//			spi_readsector((long *)buf);
-			int j;
-//			SPI(0xff);
-			spi_checksum=0;
-			for(;bytes>=4;bytes-=4)
-			{
-				int t,v;
-
-				t=SPI_PUMP_LE();
-				*(int *)buf=t;
-//				printf("%d: %d\n",buf,t);
-				buf+=4;
-				spi_checksum+=t;
-			}
+			if(!buf)
+				EnableDirectSD();
 			for(;bytes>0;--bytes)
 			{
 				int t,v;
 
 				t=SPI(0xff);
-				*buf++=t;
-//				printf("%d: %d\n",buf,t);
-				spi_checksum+=t;
+				if(buf)
+					*buf++=t;
 			}
+			SPI(0xff);
+			SPI(0xff);
+			if(!buf)
+				DisableDirectSD();
 
 			i=1; // break out of the loop
 			result=1;
 		}
 	}
-	SPI(0xff);
 	return(result);
 }
 
@@ -384,7 +370,8 @@ int sd_read_sector(unsigned long lba,unsigned char *buf)
 	r=cmd_read(lba);
 	if(r!=0)
 	{
-		printf("Read command failed at %d (%d)\n",lba,r);
+		PDBG("Read failed at %d ",lba);
+		PDBG("(%d)",r);
 		return(result);
 	}
 	result=sd_read(buf,512);

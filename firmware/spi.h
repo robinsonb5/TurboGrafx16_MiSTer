@@ -32,6 +32,10 @@
 #define SPI_ENABLE_FAST(x) {while((HW_SPI(HW_SPI_CS)&(1<<HW_SPI_BUSY))); HW_SPI(HW_SPI_CS)=((1<<HW_SPI_FAST)|(1<<x)|1);}
 #define SPI_DISABLE(x) {while((HW_SPI(HW_SPI_CS)&(1<<HW_SPI_BUSY))); HW_SPI(HW_SPI_CS)=((1<<x)|0);}
 
+#define EnableSD() SPI_ENABLE_FAST(HW_SPI_CS_SD)
+#define DisableSD() SPI_DISABLE(HW_SPI_CD_SD)
+#define EnableDirectSD() SPI_ENABLE_FAST(HW_SPI_SNIFF)
+#define DisableDirectSD() SPI_DISABLE(HW_SPI_SNIFF)
 #define EnableIO() SPI_ENABLE_FAST(HW_SPI_CONF)
 #define DisableIO() SPI_DISABLE(HW_SPI_CONF)
 #define EnableOsd() SPI_ENABLE_FAST(HW_SPI_OSD)

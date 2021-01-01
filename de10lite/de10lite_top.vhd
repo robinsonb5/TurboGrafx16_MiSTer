@@ -269,9 +269,7 @@ guest: COMPONENT turbografx16
 );
 
 -- Pass internal signals to external SPI interface
-sd_mosi <= spi_toguest;
 sd_clk <= spi_clk_int;
-
 
 controller : entity work.controller
 	generic map (
@@ -285,10 +283,11 @@ controller : entity work.controller
 
 		-- SPI signals
 		spi_miso => sd_miso,
-		spi_mosi	=> spi_toguest,
+		spi_mosi	=> sd_mosi,
 		spi_clk => spi_clk_int,
 		spi_cs => sd_cs,
 		spi_fromguest => spi_fromguest,
+		spi_toguest => spi_toguest,
 		spi_ss2 => spi_ss2,
 		spi_ss3 => spi_ss3,
 		spi_ss4 => spi_ss4,

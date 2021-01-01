@@ -184,7 +184,7 @@ data_io data_io
 	.clk_sys(clk_sys),
 	.SPI_SCK(SPI_SCK),
 	.SPI_DI(SPI_DI),
-	.SPI_DO(SPI_DO),
+	.SPI_DO(SPI_DI),
 	.SPI_SS2(SPI_SS2),
 	.SPI_SS4(SPI_SS4),
 
@@ -329,7 +329,7 @@ sdram sdram
 	.init_n(locked),
 	.clk(clk_mem),
 	.clkref(ce_vid),
-	.sync_en(dcc==2'b10), // sync only in hires mode
+//	.sync_en(dcc==2'b10), // sync only in hires mode
 
 	.rom_addr(rom_addr_sd),
 	.rom_din(ioctl_dout),
@@ -526,7 +526,7 @@ pce_top #(LITE) pce_top
 
 	.ReducedVBL(~overscan),
 	.BORDER_EN(border),
-	.VIDEO_DCC(dcc),
+//	.VIDEO_DCC(dcc),
 	.VIDEO_R(r),
 	.VIDEO_G(g),
 	.VIDEO_B(b),
