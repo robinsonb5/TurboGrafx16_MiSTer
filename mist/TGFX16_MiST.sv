@@ -276,8 +276,6 @@ reg         aram_wr_last;
 wire        aram_req;
 wire        aram_req_reg;
 
-reg         vram_rd_pulse;
-
 reg         ioctl_wr_last;
 
 always @(posedge clk_sys) begin
@@ -304,8 +302,6 @@ always @(posedge clk_sys) begin
 		aram_din <= ARAM_D;
 	end
 
-	vram_rd_pulse <= ce_vid;
-
 end
 
 always @(posedge clk_mem) begin
@@ -319,20 +315,15 @@ always @(posedge clk_mem) begin
 		end
 */
 
-	reg vram_rd_pulse_d;
-	vram_rd_pulse_d <= vram_rd_pulse;
-
 	vram0_weD <= VRAM0_WE;
-//	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
-	if ((~vram0_weD & VRAM0_WE) || (VRAM0_RD & ~vram_rd_pulse_d & vram_rd_pulse)) begin
+	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
 		vram0_addr_sd <= VRAM0_ADDR[15:1];
 		vram0_din <= VRAM0_D;
 		vram0_req <= ~vram0_req;
 	end
 
 	vram1_weD <= VRAM1_WE;
-//	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
-	if ((~vram1_weD & VRAM1_WE) || (VRAM1_RD & ~vram_rd_pulse_d & vram_rd_pulse)) begin
+	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
 		vram1_addr_sd <= VRAM1_ADDR[15:1];
 		vram1_din <= VRAM1_D;
 		vram1_req <= ~vram1_req;
@@ -345,7 +336,8 @@ sdram sdram
 	.*,
 	.init_n(locked),
 	.clk(clk_mem),
-	.clkref(ce_rom),
+	.clkref(ce_vid),
+	.sync_en(dcc==2'b10), // sync only in hires mode
 
 	.rom_addr(rom_addr_sd),
 	.rom_din(ioctl_dout),
@@ -542,6 +534,7 @@ pce_top #(LITE) pce_top
 
 	.ReducedVBL(~overscan),
 	.BORDER_EN(border),
+	.VIDEO_DCC(dcc),
 	.VIDEO_R(r),
 	.VIDEO_G(g),
 	.VIDEO_B(b),
@@ -560,6 +553,7 @@ wire hs,vs;
 wire hbl,vbl;
 wire bw;
 wire ce_vid;
+wire [1:0] dcc;
 
 mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
 (
