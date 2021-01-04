@@ -1,6 +1,9 @@
 [submodule "mist/mist-modules"]
 	path = mist/mist-modules
-	url = https://github.com/mist-devel/mist-modules.git
+	url = https://github.com/robinsonb5/mist-modules.git
 [submodule "EightThirtyTwo"]
 	path = EightThirtyTwo
 	url = https://github.com/robinsonb5/EightThirtyTwo.git
+[submodule "chameleon-modules"]
+	path = chameleon-modules
+	url = https://github.com/robinsonb5/chameleon-modules.git

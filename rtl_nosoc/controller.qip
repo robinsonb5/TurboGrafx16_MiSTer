@@ -1,5 +1,6 @@
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "controller.vhd"]
 set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) "../EightThirtyTwo/RTL/eightthirtytwo.qip"]
+set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) "../EightThirtyTwo/RTL/debug_bridge_jtag.qip"]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "../EightThirtyTwo/romgen/rom_pkg.vhd"]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "../firmware/controller_rom.vhd"]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "simple_uart.vhd"]

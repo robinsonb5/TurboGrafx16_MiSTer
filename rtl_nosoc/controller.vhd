@@ -24,6 +24,7 @@ entity controller is
 		spi_ss3 : out std_logic;
 		spi_ss4 : out std_logic;
 		conf_data0 : out std_logic;
+		spi_ack : in std_logic;
 		
 		-- PS/2 signals
 		ps2k_clk_in : in std_logic := '1';
@@ -290,6 +291,7 @@ spi : entity work.spi_controller
 		-- Hardware interface
 		miso => spi_fromguest_sd,
 		mosi => spi_mosi_int,
+		ack => spi_ack,
 		spiclk_out => spi_clk
 	);
 
@@ -416,6 +418,8 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 		debug_ack=>debug_ack		
 	);
 
+gendebugbridge:
+if debug=true generate
 	debugbridge : entity work.debug_bridge_jtag
 	port map
 	(
@@ -427,7 +431,12 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 		ack => debug_ack,
 		wr => debug_wr
 	);
+end generate;
 
+gennodebug:
+if debug=false generate
+	debug_req<='0';
+end generate;
 
 process(clk)
 begin

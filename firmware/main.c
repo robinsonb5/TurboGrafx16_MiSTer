@@ -261,8 +261,8 @@ static char *video_labels[]=
 static char *scanline_labels[]=
 {
 	"Scanlines: Off",
-	"Scanlines: 25%"
-	"Scanlines: 50%"
+	"Scanlines: 25%",
+	"Scanlines: 50%",
 	"Scanlines: 75%"
 };
 
@@ -282,21 +282,15 @@ static struct menu_entry topmenu[]=
 };
 
 
-
-
-
 char filename[16];
-//void setstack();
 int main(int argc,char **argv)
 {
 	int havesd;
 	int i,c;
 	int osd=0;
-//	setstack();
 
 	PS2Init();
 
-	puts("Fetching conf string\n");
 	filename[0]=0;
 
 	SPI(0xff);
@@ -306,8 +300,10 @@ int main(int argc,char **argv)
 	while(c=SPI(0xff))
 	{
 		filename[i]=c;
-		spin();
+//		spin();
 		putchar(c);
+
+#if 0
 		if(c==';')
 		{
 			if(i<8)
@@ -327,13 +323,14 @@ int main(int argc,char **argv)
 			break;
 		}
 		++i;
+#endif
 	}
 	while(c=SPI(0xff))
 		;
 	SPI_DISABLE(HW_SPI_CONF);
 
-	spin();
-	puts(filename);
+//	spin();
+//	puts(filename);
 
 	puts("Initializing SD card\n");
 	havesd=spi_init() && FindDrive();
