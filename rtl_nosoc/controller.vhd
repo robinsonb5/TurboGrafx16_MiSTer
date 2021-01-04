@@ -24,7 +24,7 @@ entity controller is
 		spi_ss3 : out std_logic;
 		spi_ss4 : out std_logic;
 		conf_data0 : out std_logic;
-		spi_ack : in std_logic;
+		spi_ack : in std_logic := '1';
 		
 		-- PS/2 signals
 		ps2k_clk_in : in std_logic := '1';
