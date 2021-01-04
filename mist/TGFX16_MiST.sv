@@ -387,7 +387,7 @@ sdram sdram
 	.aram_din(aram_din),
 //	.aram_din(ARAM_D),
 	.aram_dout(aram_dout),
-	.aram_req(aram_req),
+	.aram_req(!sgx & aram_req),
 	.aram_req_ack(),
 //	.aram_we(~ARAM_WE_N)
 	.aram_we(aram_wr_last)
