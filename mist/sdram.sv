@@ -146,9 +146,9 @@ wire [3:0] STATE_LAST      = {sync_r, ~sync_r, 2'b11};//? 4'd11 : 4'd7; // last 
 
 reg [3:0] t;
 reg       sync_r;
+reg       clkref_d;
 
 always @(posedge clk) begin
-	reg clkref_d;
 	reg allow_refresh;
 
 	clkref_d <= clkref;
@@ -281,12 +281,16 @@ always @(posedge clk) begin
 
 end
 
+wire clkref_rise = ~clkref_d & clkref;
+reg  clkref_rise_d;
+always @(posedge clk) clkref_rise_d <= clkref_rise;
+
 // ROM, RAM: bank 0
 // BSRAM: bank 1
 always @(*) begin
 	next_port[0] = PORT_NONE;
 	next_addr[0] = 0;
-	if (refresh) next_port[0] = PORT_NONE;
+	if (refresh || ((clkref_rise || clkref_rise_d) && !sync_r)) next_port[0] = PORT_NONE;
 	else if (rom_req ^ rom_req_state) begin
 		next_port[0] = PORT_ROM;
 		next_addr[0] = { 3'b000, rom_addr, 1'b0 };
