@@ -149,7 +149,11 @@ reg       sync_r;
 
 always @(posedge clk) begin
 	reg clkref_d;
+	reg allow_refresh;
+
 	clkref_d <= clkref;
+	// allow refresh to start when a VRAM request is expected, but didn't get one
+	allow_refresh <= ~clkref & clkref_d;
 
 	case(t)
 		4'h0: begin // RAS0
@@ -159,7 +163,7 @@ always @(posedge clk) begin
 				if (next_port[0] == PORT_NONE && ~|oe_latch[2:1] && ~|we_latch[2:1] && !refresh && !init && !sync_r) begin
 					if (next_port[1] != PORT_NONE)
 						t <= STATE_RAS1;
-					else if (next_port[2] != PORT_NONE)
+					else if (next_port[2] != PORT_NONE || (need_refresh && allow_refresh))
 						t <= STATE_RAS2;
 					else
 						t <= STATE_RAS0;
