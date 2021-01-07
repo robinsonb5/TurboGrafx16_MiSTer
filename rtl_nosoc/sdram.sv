@@ -146,32 +146,55 @@ wire [3:0] STATE_LAST      = {sync_r, ~sync_r, 2'b11};//? 4'd11 : 4'd7; // last 
 
 reg [3:0] t;
 reg       sync_r;
+reg       clkref_d;
 
 always @(posedge clk) begin
-	reg clkref_d;
+	reg allow_refresh;
+
 	clkref_d <= clkref;
-	if (t == STATE_RAS0) sync_r <= sync_en;
+	// allow refresh to start when a VRAM request is expected, but didn't get one
+	allow_refresh <= ~clkref & clkref_d;
 
-//	t <= t + 1'd1;
-//	if (t == STATE_LAST) t <= STATE_RAS0;
-
-	if (t == STATE_LAST) begin
-		if ((~clkref_d & clkref) | !sync_r) t <= STATE_RAS0;
-	end else case(t)
-		4'h0: t <= 4'h1;
+	case(t)
+		4'h0: begin // RAS0
+				t <= 4'h1;
+				sync_r <= sync_en;
+				// shortcut if no request is pending
+				if (next_port[0] == PORT_NONE && ~|oe_latch[2:1] && ~|we_latch[2:1] && !refresh && !init && !sync_r) begin
+					if (next_port[1] != PORT_NONE)
+						t <= STATE_RAS1;
+					else if (next_port[2] != PORT_NONE || (need_refresh && allow_refresh))
+						t <= STATE_RAS2;
+					else
+						t <= STATE_RAS0;
+				end
+			end
 		4'h1: t <= 4'h2;
-		4'h2: t <= 4'h3;
+		4'h2: begin // RAS1
+				t <= 4'h3;
+				// shortcut if no request is pending
+				if (next_port[1] == PORT_NONE && ~oe_latch[0] && ~oe_latch[2] && ~we_latch[0] && ~we_latch[2] && !refresh && !init && !sync_r)
+					t <= STATE_RAS2;
+			end
 		4'h3: t <= 4'h4;
-		4'h4: t <= 4'h5;
+		4'h4: begin // RAS2
+				t <= 4'h5;
+				// shortcut if no request is pending
+				if (next_port[2] == PORT_NONE && ~|oe_latch[1:0] && ~|we_latch[1:0] && !need_refresh && !init && !sync_r)
+					t <= STATE_RAS0;
+			end
 		4'h5: t <= 4'h6;
 		4'h6: t <= 4'h7;
-		4'h7: t <= 4'h8;
+		4'h7: begin // LAST
+				t <= 4'h8;
+				if (!sync_r) t <= STATE_RAS0;
+			end
 		4'h8: t <= 4'h9;
 		4'h9: t <= 4'ha;
 		4'ha: t <= 4'hb;
+		4'hb: if (~clkref_d & clkref) t <= STATE_RAS0;
 	endcase
 
-	if (t == STATE_RAS2 && next_port[2] == PORT_NONE && !oe_latch && !we_latch && !need_refresh && !init && !sync_r) t <= STATE_RAS0;
 end
 
 // ---------------------------------------------------------------------
@@ -258,12 +281,16 @@ always @(posedge clk) begin
 
 end
 
+wire clkref_rise = ~clkref_d & clkref;
+reg  clkref_rise_d;
+always @(posedge clk) clkref_rise_d <= clkref_rise;
+
 // ROM, RAM: bank 0
 // BSRAM: bank 1
 always @(*) begin
 	next_port[0] = PORT_NONE;
 	next_addr[0] = 0;
-	if (refresh) next_port[0] = PORT_NONE;
+	if (refresh || ((clkref_rise || clkref_rise_d) && !sync_r)) next_port[0] = PORT_NONE;
 	else if (rom_req ^ rom_req_state) begin
 		next_port[0] = PORT_ROM;
 		next_addr[0] = { 3'b000, rom_addr, 1'b0 };

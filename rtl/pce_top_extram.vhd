@@ -8,7 +8,8 @@ entity pce_top is
 	generic (
 		LITE : integer := 0;
 		PSG_O_WIDTH: integer := 16;
-		MAX_SPRITES: integer := 16
+		MAX_SPRITES: integer := 16;
+		USE_INTERNAL_RAM: integer := 0
 	);
 	port(
 		RESET       : in  std_logic;
@@ -142,7 +143,7 @@ signal CPU_ROM_SEL_N	: std_logic;
 
 -- RAM signals
 signal RAM_DO			: std_logic_vector(7 downto 0);
-signal RAM_A			: std_logic_vector(14 downto 0);
+signal RAM_A			: std_logic_vector(12 downto 0);
 
 signal PRAM_DO			: std_logic_vector(7 downto 0);
 signal CPU_PRAM_SEL_N: std_logic;
@@ -214,7 +215,7 @@ component CODES is
 end component;
 
 signal VCE_HS_F, VCE_HS_R, VCE_VS_F, VCE_VS_R: std_logic;
-signal CLR_A	   : std_logic_vector(14 downto 0);
+signal CLR_A	   : std_logic_vector(12 downto 0);
 signal CLR_WE		: std_logic;
 
 signal VCE_DCC		: std_logic_vector(1 downto 0);
@@ -538,7 +539,7 @@ CPU_ROM_SEL_N <= CPU_A(20);
 -- CPU data bus
 CPU_DI <=  CD_DO     when CD_SEL_N       = '0'
 			else EXT_RAM_DI when EXT_RAM_SEL   = '1'
-			--else RAM_DO    when INT_RAM_SEL    = '1'
+			else RAM_DO    when INT_RAM_SEL    = '1'
 			else AC_DO     when AC_SEL_N       = '0'
 			else BRM_DO    when CPU_BRM_SEL_N  = '0'
 			else ROM_DO    when CPU_ROM_SEL_N  = '0'
@@ -626,7 +627,7 @@ end process;
 
 CPU_PRAM_SEL_N <= CPU_A(20) or not CPU_A(19) or not ROM_POP;
 
-RAM : entity work.dpram generic map (15,8)
+RAM : entity work.dpram generic map (13,8)
 port map (
 	clock		=> CLK,
 	address_a=> RAM_A,
@@ -640,11 +641,11 @@ port map (
 );
 --INT_RAM_SEL <= '0';
 --DBG_RAM_OK <= '1' when RAM_DO = EXT_RAM_DI else '0';
---INT_RAM_SEL <= '1' when CPU_RAM_SEL_N = '0' and (SGX = '0' or CPU_A(14 downto 13) = "00") else '0';
+INT_RAM_SEL <= '1' when USE_INTERNAL_RAM /= 0 and CPU_RAM_SEL_N = '0' and (SGX = '0' or CPU_A(14 downto 13) = "00") else '0';
 --INT_RAM_SEL <= '1' when CPU_RAM_SEL_N = '0' else '0';
 --
 RAM_A(12 downto 0)  <= CPU_A(12 downto 0);
-RAM_A(14 downto 13) <= CPU_A(14 downto 13) when SGX = '1' else "00";
+--RAM_A(14 downto 13) <= CPU_A(14 downto 13) when SGX = '1' else "00";
 
 -- Backup RAM
 BRM_A <= CPU_A(10 downto 0);
@@ -702,7 +703,7 @@ port map(
 --CD_RAM_CS_N <= '1';
 --CD_SEL_N <= '1';
 
-EXT_RAM_SEL <= not (((CD_RAM_CS_N and AC_RAM_CS_N) or not CD_EN) and CPU_RAM_SEL_N and CPU_PRAM_SEL_N);-- and not INT_RAM_SEL;
+EXT_RAM_SEL <= not (((CD_RAM_CS_N and AC_RAM_CS_N) or not CD_EN) and CPU_RAM_SEL_N and CPU_PRAM_SEL_N) and not INT_RAM_SEL;
 EXT_RAM_A  <= '0' & AC_RAM_A when AC_RAM_CS_N = '0' else
               "111000000" & CPU_A(12 downto 0) when CPU_RAM_SEL_N = '0' and SGX = '0' else
               "1110000" & CPU_A(14 downto 0) when CPU_RAM_SEL_N = '0' and SGX = '1' else

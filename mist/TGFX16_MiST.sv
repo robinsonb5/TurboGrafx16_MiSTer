@@ -387,7 +387,7 @@ sdram sdram
 	.aram_din(aram_din),
 //	.aram_din(ARAM_D),
 	.aram_dout(aram_dout),
-	.aram_req(aram_req),
+	.aram_req(!sgx & aram_req),
 	.aram_req_ack(),
 //	.aram_we(~ARAM_WE_N)
 	.aram_we(aram_wr_last)
@@ -444,7 +444,7 @@ wire        ce_rom;
 
 wire signed [15:0] cdda_sl, cdda_sr, adpcm_s, psg_sl, psg_sr;
 
-pce_top #(LITE) pce_top
+pce_top #(.LITE(LITE), .USE_INTERNAL_RAM(1'b1)) pce_top
 (
 	.RESET(reset),
 
