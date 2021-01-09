@@ -290,7 +290,7 @@ begin
 			clk => clk_85,
 			enable => '1',
 
-			button => not reset_btn,
+			button => not (reset_btn and pll_locked),
 			reset => reset,
 			nreset => reset_n
 		);
@@ -315,7 +315,7 @@ begin
 -- -----------------------------------------------------------------------
 	my1Mhz : entity work.chameleon_1mhz
 		generic map (
-			clk_ticks_per_usec => 100
+			clk_ticks_per_usec => 85
 		)
 		port map (
 			clk => clk_85,

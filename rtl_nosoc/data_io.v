@@ -36,6 +36,7 @@ module data_io
 
 	// ARM -> FPGA download
 	output reg        ioctl_download = 0, // signal indicating an active download
+	output reg        ioctl_verify = 0,
 	output reg  [7:0] ioctl_index,        // menu index used to upload the file
 	output reg        ioctl_wr = 0,
 	output reg [24:0] ioctl_addr,
@@ -52,6 +53,7 @@ localparam UIO_FILE_INDEX   = 8'h55;
 reg       spi_receiver_strobe_r = 0;
 reg       spi_transfer_end_r = 1;
 reg [7:0] spi_byte_in;
+reg [15:0] checksum = 16'b0 /* synthesis noprune */;
 
 // data_io has its own SPI interface to the io controller
 // Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
@@ -146,9 +148,11 @@ always @(posedge clk_sys) begin
 					if(spi_byte_in) begin
 						addr <= 0;
 						ioctl_download <= 1; 
+						ioctl_verify <= spi_byte_in[1];
 					end else begin
 						ioctl_addr <= addr;
 						ioctl_download <= 0;
+						ioctl_verify <= 0;
 					end
 				end
 
@@ -191,8 +195,11 @@ always @(posedge clk_sys) begin
 				ioctl_wr <= ~ioctl_wr;
 				ioctl_addr <= addr;
 				addr <= addr + 2'd2;
-			end else
+				checksum[15:8] <= checksum[15:8] ^ spi_byte_in2;
+			end else begin
 				ioctl_dout[7:0] <= spi_byte_in2;
+				checksum[7:0] <= checksum[7:0] ^ spi_byte_in2;
+			end
 	end
 
 end

@@ -193,6 +193,7 @@ data_io data_io
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 	.ioctl_download(ioctl_download),
+	.ioctl_verify(ioctl_verify),
 	.ioctl_index(ioctl_index)
 );
 
@@ -337,7 +338,7 @@ sdram sdram
 	.rom_dout(rom_dout),
 	.rom_req(rom_req),
 	.rom_req_ack(rom_req_ack),
-	.rom_we(cart_download),
+	.rom_we(cart_download & !ioctl_verify),
 
 	.wram_addr(wram_addr_sd),
 	.wram_din(wram_din),
@@ -436,6 +437,24 @@ wire  [7:0] cd_ram_do;
 wire        ce_rom;
 
 wire signed [15:0] cdda_sl, cdda_sr, adpcm_s, psg_sl, psg_sr;
+
+
+reg [15:0] verifychecksum /* synthesis noprune */;
+reg verifyack_d;
+reg ioctl_verify_d;
+
+always @(posedge clk_sys) begin
+	if(rom_req == verifyack_d)	/* Only update while a read isn't in progress... */
+		ioctl_verify_d<=ioctl_verify;
+	
+	if(ioctl_verify &! ioctl_verify_d)
+		verifychecksum<=16'b0;
+	
+	verifyack_d<=rom_req_ack;
+	if(ioctl_verify_d && (verifyack_d!=rom_req_ack)) begin
+		verifychecksum<=verifychecksum ^ rom_dout;
+	end
+end
 
 pce_top #(LITE) pce_top
 (

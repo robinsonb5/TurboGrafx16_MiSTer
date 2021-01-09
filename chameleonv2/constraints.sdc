@@ -17,7 +17,7 @@ set clk_med    "clocks|altpll_component|auto_generated|pll1|clk[3]"
 
 # generated clocks
 create_generated_clock -name clk_sdram -source [get_pins {clocks|altpll_component|auto_generated|pll1|clk[0]}] [get_ports {ram_clk}]
-create_generated_clock -name clk_spi -source [get_pins $clk_fast] -divide_by 4 [get_nets {controller|spi_controller|sck}]
+create_generated_clock -name clk_spi -source [get_pins $clk_slow] -divide_by 4 [get_nets {controller|spi|sck}]
 
 # name SDRAM ports
 set sdram_outputs [get_ports {ram_d[*] ram_a[*] ram_ldqm ram_udqm ram_we ram_cas ram_ras ram_ba[*] }]
@@ -33,12 +33,13 @@ derive_clock_uncertainty
 
 
 # input delay
-set_input_delay -clock clk_sdram -max 6.5 $sdram_inputs
-set_input_delay -clock clk_sdram -min 5.5 $sdram_inputs
+set_input_delay -clock clk_sdram -max 6.0 $sdram_inputs
+set_input_delay -clock clk_sdram -min 1.0 $sdram_inputs
 
-set_input_delay -clock $clk_fast 0.5 [get_ports low_d[*]]
-set_input_delay -clock $clk_fast 0.5 [get_ports ps2iec[*]]
-set_input_delay -clock $clk_fast 0.5 [get_ports {ba_in dotclk_n ioef ir_data phi2_n reset_btn romlh spi_miso usart_cts}]
+set_input_delay -clock $clk_med 0.5 [get_ports low_d[*]]
+set_input_delay -clock $clk_med 0.5 [get_ports ps2iec[*]]
+set_input_delay -clock $clk_slow 0.5 [get_ports {ba_in dotclk_n ioef ir_data phi2_n reset_btn romlh usart_cts}]
+set_input_delay -clock clk_spi 0.5 [get_ports { spi_miso }]
 
 
 #output delay
@@ -52,6 +53,7 @@ set_output_delay -clock $clk_med 0.5 [get_ports low_a[*]]
 set_output_delay -clock $clk_med 0.5 [get_ports ser_out*]
 set_output_delay -clock $clk_med 0.5 [get_ports {game_out irq_out mmc_cs ps2iec_sel rw_out sa15_out}]
 set_output_delay -clock $clk_med 0.5 [get_ports {sa_oe sd_dir sd_oe spi_clk spi_mosi}]
+set_output_delay -clock $clk_slow 0.5 [get_ports {spi_clk spi_mosi}]
 
 # false paths
 

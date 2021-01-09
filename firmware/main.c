@@ -29,6 +29,43 @@
 
 fileTYPE file;
 
+void VerifyROM()
+{
+	int imgsize=file.size;
+	int sendsize;
+	SPI_ENABLE(HW_SPI_FPGA)
+	SPI(SPI_FPGA_FILE_TX);
+	SPI(0x03);	/* Verify */
+	SPI_DISABLE(HW_SPI_FPGA);
+
+	SPI_ENABLE_FAST(HW_SPI_SNIFF);
+	while(imgsize)
+	{
+		if(imgsize>=512)
+		{
+			sendsize=512;
+			imgsize-=512;
+		}
+		else
+		{
+			sendsize=imgsize;
+			imgsize=0;
+		}
+		while(sendsize--)
+		{
+			SPI(0x00);
+		}
+		SPI(0x00); /* CRC bytes */
+		SPI(0x00);
+	}
+	SPI_DISABLE(HW_SPI_SNIFF);
+
+	SPI_ENABLE(HW_SPI_FPGA);
+	SPI(SPI_FPGA_FILE_TX);
+	SPI(0x00);
+	SPI_DISABLE(HW_SPI_FPGA);
+}
+
 int LoadROM(const char *fn)
 {
 	if(FileOpen(&file,fn))
@@ -39,7 +76,7 @@ int LoadROM(const char *fn)
 
 		SPI_ENABLE(HW_SPI_FPGA);
 		SPI(SPI_FPGA_FILE_TX);
-		SPI(0xff);
+		SPI(0x01); /* Upload */
 		SPI_DISABLE(HW_SPI_FPGA);
 
 		while(imgsize)
@@ -69,6 +106,8 @@ int LoadROM(const char *fn)
 */
 			FileNextSector(&file);
 		}
+
+		VerifyROM();
 		SPI_ENABLE(HW_SPI_FPGA);
 		SPI(SPI_FPGA_FILE_TX);
 		SPI(0x00);
@@ -347,6 +386,10 @@ int main(int argc,char **argv)
 		{
 			
 
+		}
+		if(TestKey(KEY_F1))
+		{
+			VerifyROM();
 		}
 
 		if(TestKey(KEY_F11))

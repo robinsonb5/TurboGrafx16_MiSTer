@@ -101,6 +101,8 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 // 64ms/8192 rows = 7.8us -> 1000 cycles@128MHz
 localparam RFRSH_CYCLES = 10'd1000;
 
+reg [15:0] checksum = 16'b0 /* synthesis noprune */;
+
 // ---------------------------------------------------------------------
 // ------------------------ sdram state machine ------------------------
 // ---------------------------------------------------------------------
@@ -387,6 +389,7 @@ always @(posedge clk) begin
 				din_latch[0] <= rom_din;
 				ds[0] <= 2'b11;
 				sd_cmd <= CMD_ACTIVE;
+				if(rom_we) checksum <= checksum ^ rom_din;				
 			end
 
 			PORT_WRAM: begin
