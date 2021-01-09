@@ -1,7 +1,12 @@
-QUARTUS_CYCLONEIII =
-QUARTUS_CYCLONEV =
-QUARTUS_CYCLONE10LP =
-QUARTUS_MAX10 = 
+PROJECT = TurboGrafx16
+
+Q13 = $(HOME)/altera/13.0sp1/quartus/bin/
+Q18 = $(HOME)/intelFPGA_lite/18.1/quartus/bin/
+
+QUARTUS_CYCLONEIII = $(Q13)
+QUARTUS_CYCLONEV = $(Q18)
+QUARTUS_CYCLONE10LP = $(Q18)
+QUARTUS_MAX10 = $(Q18)
 
 BOARDS_CYCLONEIII = chameleonv1 mist
 BOARDS_CYCLONE10LP = chameleonv2
@@ -20,30 +25,30 @@ EightThirtyTwo/vbcc/bin/vbcc832: EightThirtyTwo/RTL/eightthirtytwo_cpu.vhd
 firmware: EightThirtyTwo/vbcc/bin/vbcc832 firmware/
 
 boards:
-	for BOARD in ${BOARDS_CYCLONEIII}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_CYCLONEIII); \
-	done
 	for BOARD in ${BOARDS_CYCLONE10LP}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_CYCLONE10LP); \
+		make -C $$BOARD -f ../quartus.mk BOARD=$$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_CYCLONE10LP); \
+	done
+	for BOARD in ${BOARDS_CYCLONEIII}; do \
+		make -C $$BOARD -f ../quartus.mk BOARD=$$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_CYCLONEIII); \
 	done
 	for BOARD in ${BOARDS_MAX10}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_MAX10); \
+		make -C $$BOARD -f ../quartus.mk BOARD=$$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_MAX10); \
 	done
 	for BOARD in ${BOARDS_CYCLONEV}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_CYCLONEV); \
+		make -C $$BOARD -f ../quartus.mk BOARD=$$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_CYCLONEV); \
 	done
 
 clean:
 	for BOARD in ${BOARDS_CYCLONEIII}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_CYCLONEIII) clean ;\
+		make -C $$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_CYCLONEIII) clean ;\
 	done
 	for BOARD in ${BOARDS_CYCLONE10LP}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_CYCLONE10LP) clean ;\
+		make -C $$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_CYCLONE10LP) clean ;\
 	done
 	for BOARD in ${BOARDS_MAX10}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_MAX10) clean ;\
+		make -C $$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_MAX10) clean ;\
 	done
 	for BOARD in ${BOARDS_CYCLONEV}; do \
-		make -C $$BOARD QUARTUS=$(QUARTUS_CYCLONEV) clean ;\
+		make -C $$BOARD PROJECT=$(PROJECT) QUARTUS=$(QUARTUS_CYCLONEV) clean ;\
 	done
 

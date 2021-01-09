@@ -98,7 +98,7 @@ wire       ac_en = 0;//status[14];
 
 reg reset;
 always @(posedge clk_sys) begin
-	reset <= buttons[1] | status[0] | ioctl_download;
+	reset <= buttons[1] | status[0] | ioctl_download | !RESET_N;
 end
 
 //////////////////   MiST I/O   ///////////////////

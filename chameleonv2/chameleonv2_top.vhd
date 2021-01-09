@@ -121,9 +121,7 @@ architecture rtl of chameleonv2_top is
 	signal phi2 : std_logic;
 	
 -- Global signals
-	signal reset : std_logic;
 	signal reset_n : std_logic;
-	signal reset_core : std_logic;
 
 -- LEDs
 	signal led_green : std_logic;
@@ -182,9 +180,7 @@ architecture rtl of chameleonv2_top is
 	signal audio_l : std_logic_vector(15 downto 0);
 	signal audio_r : std_logic_vector(15 downto 0);
 
--- IO
-	signal button_reset_n : std_logic;
-	
+-- IO	
 	signal power_button : std_logic;
 	signal play_button : std_logic;
 	signal runstop : std_logic;
@@ -278,22 +274,6 @@ begin
 	clock_ior <='1';
 	clock_iow <='1';
 	irq_out <= not docking_irq;
-	
--- -----------------------------------------------------------------------
--- Reset
--- -----------------------------------------------------------------------
-	myReset : entity work.gen_reset
-		generic map (
-			resetCycles => reset_cycles
-		)
-		port map (
-			clk => clk_85,
-			enable => '1',
-
-			button => not (reset_btn and pll_locked),
-			reset => reset,
-			nreset => reset_n
-		);
 
 -- -----------------------------------------------------------------------
 -- Clocks and PLL
@@ -362,8 +342,8 @@ begin
 			ser_out_dat => ser_out_dat,
 			ser_out_rclk => ser_out_rclk,
 
-			reset_c64 => reset,
-			reset_iec => reset,
+			reset_c64 => not reset_n,
+			reset_iec => not reset_n,
 			ps2_mouse_clk => ps2_mouse_clk_out,
 			ps2_mouse_dat => ps2_mouse_dat_out,
 			ps2_keyboard_clk => ps2_keyboard_clk_out,
@@ -402,7 +382,7 @@ begin
 				phi2_n => phi2_n,
 				dotclock_n => dotclk_n,
 
-				reset => reset,
+				reset => not reset_n,
 
 				ir_data => ir,
 				ioef => ioef,
@@ -482,7 +462,7 @@ joy4<="1" & joystick4;
 			-- clocks and reset
 			clk_sys => clk_sys,
 			clk_mem => clk_mem,
-			RESET_N => reset_core,
+			RESET_N => reset_n,
 			
 			-- SDRAM
 			SDRAM_DQ => ram_d,
@@ -540,8 +520,8 @@ joy4<="1" & joystick4;
 		)
 		port map (
 			clk => clk_sys,
-			reset_in => reset_n,
-			reset_out => reset_core,
+			reset_in => reset_btn and pll_locked,
+			reset_out => reset_n,
 
 			-- SPI signals
 			spi_miso => spi_miso,

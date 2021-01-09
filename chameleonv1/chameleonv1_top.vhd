@@ -13,7 +13,7 @@ library work;
 
 -- -----------------------------------------------------------------------
 
-entity chameleon_toplevel is
+entity chameleonv1_top is
 	generic (
 		resetCycles: integer := 131071
 	);
@@ -48,33 +48,33 @@ entity chameleon_toplevel is
 		usart_cts : in std_logic;
 
 -- SDRam
-		sd_clk : out std_logic;
-		sd_data : inout std_logic_vector(15 downto 0);
-		sd_addr : out std_logic_vector(12 downto 0);
-		sd_we_n : out std_logic;
-		sd_ras_n : out std_logic;
-		sd_cas_n : out std_logic;
-		sd_ba_0 : out std_logic;
-		sd_ba_1 : out std_logic;
-		sd_ldqm : out std_logic;
-		sd_udqm : out std_logic;
+		ram_clk : out std_logic;
+		ram_data : inout std_logic_vector(15 downto 0);
+		ram_addr : out std_logic_vector(12 downto 0);
+		ram_we_n : out std_logic;
+		ram_ras_n : out std_logic;
+		ram_cas_n : out std_logic;
+		ram_ba_0 : out std_logic;
+		ram_ba_1 : out std_logic;
+		ram_ldqm : out std_logic;
+		ram_udqm : out std_logic;
 
 -- Video
 		red : out unsigned(4 downto 0);
 		grn : out unsigned(4 downto 0);
 		blu : out unsigned(4 downto 0);
-		nHSync : out std_logic;
-		nVSync : out std_logic;
+		hsync_n : out std_logic;
+		vsync_n : out std_logic;
 
 -- Audio
-		sigmaL : out std_logic;
-		sigmaR : out std_logic
+		sigma_l : out std_logic;
+		sigma_r : out std_logic
 	);
 end entity;
 
 -- -----------------------------------------------------------------------
 
-architecture rtl of chameleon_toplevel is
+architecture rtl of chameleonv1_top is
    constant reset_cycles : integer := 131071;
 	
 -- System clocks
@@ -238,7 +238,7 @@ begin
 		port map
 		(
 			inclk0 => clk8,
-			c0 => sd_clk,
+			c0 => ram_clk,
 			c1 => clk_mem,
 			c2 => clk_sys,
 			c3 => clk_85,
@@ -417,17 +417,17 @@ begin
 			RESET_N => reset_core,
 			
 			-- SDRAM
-			SDRAM_DQ => sd_data,
-			SDRAM_A => sd_addr,
-			SDRAM_DQML => sd_ldqm,
-			SDRAM_DQMH => sd_udqm,
-			SDRAM_nWE => sd_we_n,
-			SDRAM_nCAS => sd_cas_n,
-			SDRAM_nRAS => sd_ras_n,
---			SDRAM_nCS => sd_cs_n,	-- Hardwired on TC64
-			SDRAM_BA(0) => sd_ba_0,
-			SDRAM_BA(1) => sd_ba_1,
---			SDRAM_CKE => sd_cke, -- Hardwired on TC64
+			SDRAM_DQ => ram_data,
+			SDRAM_A => ram_addr,
+			SDRAM_DQML => ram_ldqm,
+			SDRAM_DQMH => ram_udqm,
+			SDRAM_nWE => ram_we_n,
+			SDRAM_nCAS => ram_cas_n,
+			SDRAM_nRAS => ram_ras_n,
+--			SDRAM_nCS => ram_cs_n,	-- Hardwired on TC64
+			SDRAM_BA(0) => ram_ba_0,
+			SDRAM_BA(1) => ram_ba_1,
+--			SDRAM_CKE => ram_cke, -- Hardwired on TC64
 
 			-- SPI interface to control module
 			SPI_SD_DI => spi_miso,
@@ -445,8 +445,8 @@ begin
 			VGA_G => vga_green(7 downto 2),
 			VGA_B => vga_blue(7 downto 2),
 			-- Audio output
-			AUDIO_L => sigmaL,
-			AUDIO_R => sigmaR
+			AUDIO_L => sigma_l,
+			AUDIO_R => sigma_r
 	);
 	
 	
@@ -458,8 +458,8 @@ begin
 			red<=unsigned(vga_red(7 downto 3));
 			grn<=unsigned(vga_green(7 downto 3));
 			blu<=unsigned(vga_blue(7 downto 3));
-			nHSync<=not vga_hsync;
-			nVSync<=not vga_vsync;
+			hsync_n<=not vga_hsync;
+			vsync_n<=not vga_vsync;
 		end if;
 	end process;
 
