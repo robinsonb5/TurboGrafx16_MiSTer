@@ -15,8 +15,8 @@ enum menu_entry_type {
 #define ROW_PAGEUP -3
 #define ROW_PAGEDOWN -4
 
-typedef int menu_action;
-#define MENU_ACTION(x) ((int)(x))
+typedef long menu_action;
+#define MENU_ACTION(x) ((long)(x))
 #define MENU_ACTION_TOGGLE(x) x
 #define MENU_ACTION_CYCLE(x) x
 #define MENU_ACTION_CALLBACK(x) ((void (*)(int row))x)
@@ -41,7 +41,10 @@ typedef int menu_action;
 
 struct menu_entry
 {
-	enum menu_entry_type type;
+	char type;
+	char val;
+	char limit;
+	char shift;
 	char *label;
 	menu_action action;	
 };

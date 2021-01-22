@@ -13,7 +13,7 @@ LDFLAGS  = -el -s_STACKSIZE=0x300
 START = $(LIBDIR)/crt0.a
 LIBS = $(LIBDIR)/libtiny832.a
 
-PRJ_OBJ = uart.o tiny_printf.o spi_sd.o minfat.o swap.o main.o interrupts.o ps2.o keyboard.o userio.o osd.o font.o menu.o
+PRJ_OBJ = uart.o spi_sd.o minfat.o swap.o main.o interrupts.o ps2.o keyboard.o userio.o osd.o font.o menu.o
 
 ROMGENDIR = ../EightThirtyTwo/romgen
 ROMGEN = $(ROMGENDIR)/romgen
@@ -38,14 +38,14 @@ controller.bin : $(START) $(LIBS) $(PRJ_OBJ)
 	$(LD) $(LDFLAGS) -o $@ -M controller.map $+
 
 %.o : %.c Makefile
-	$(CC) $(COPT) $(CFLAGS) -I$(INCDIR) -I$(LIBDIR) $*.c
+	$(CC) $(COPT) $(CFLAGS) -I$(INCDIR) $*.c
 	$(AS) $(ASFLAGS) -o $*.o $*.asm
 
 %.o : $(LIBDIR)/%.asm Makefile 
 	$(AS) $(ASFLAGS) -o $*.o $(LIBDIR)/$*.asm
 
 %.asm : %.c Makefile
-	$(CC) $(COPT) $(CFLAGS) -I$(INCDIR) -I$(LIBDIR) $*.c
+	$(CC) $(COPT) $(CFLAGS) -I$(INCDIR) $*.c
 
 $(ROMGEN): $(ROMGENDIR)/romgen.c
 	gcc -o $(ROMGENDIR)/romgen $(ROMGENDIR)/romgen.c

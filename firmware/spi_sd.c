@@ -33,34 +33,41 @@ int sd_size;
 
 unsigned char SPI_R1[6];
 
+int SPI_PUMP()
+{
+	int r,r2;
+	SPI(0xFF);
+	r=SPI_READ();
+	SPI(0xFF);
+	r2=SPI_READ();
+	r=(r<<8)|r2;
+	SPI(0xFF);
+	r2=SPI_READ();
+	r=(r<<8)|r2;
+	SPI(0xFF);
+	r2=SPI_READ();
+	r=(r<<8)|r2;
+	return(r);
+}
+
 
 int SPI_PUMP_LE()
 {
-	int r=0;
+	int r,r2;
 	SPI(0xFF);
 	r=SPI_READ();
 	SPI(0xFF);
-	r|=SPI_READ()<<8;
+	r2=SPI_READ()<<8;
+	r|=r2;
 	SPI(0xFF);
-	r|=SPI_READ()<<16;
+	r2=SPI_READ()<<16;
+	r|=r2;
 	SPI(0xFF);
-	r|=SPI_READ()<<24;
+	r2=SPI_READ()<<24;
+	r|=r2;
 	return(r);
 }
 
-int SPI_PUMP()
-{
-	int r=0;
-	SPI(0xFF);
-	r=SPI_READ();
-	SPI(0xFF);
-	r=(r<<8)|SPI_READ();
-	SPI(0xFF);
-	r=(r<<8)|SPI_READ();
-	SPI(0xFF);
-	r=(r<<8)|SPI_READ();
-	return(r);
-}
 
 int cmd_write(unsigned long cmd, unsigned long lba)
 {

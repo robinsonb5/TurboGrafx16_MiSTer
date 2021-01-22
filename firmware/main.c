@@ -25,6 +25,59 @@
 #define UPLOAD_DAT 4
 #define HW_UPLOAD(x) *(volatile unsigned int *)(UPLOADBASE+x)
 
+int statusword; /* Support 32-bit status word initially - need to be 64-bit in the long run */
+#define LINELENGTH 32
+char exts[32];
+
+#define conf_next() SPI(0xff)
+
+int conf_nextfield()
+{
+	int c;
+	do
+		c=conf_next();
+	while(c && c!=';');
+	return(c);
+}
+
+/* Copy a maximum of limit bytes to the output string, stopping when a comma is reached. */
+/* If the copy flag is zero, don't copy, just consume bytes from the input */
+
+int copytocomma(char *buf, int limit,int copy)
+{
+	int count=0;
+	int c;
+	c=conf_next();
+	while(c && c!=',' && c!=';')
+	{
+		if(count<limit && copy)
+			*buf++=c;
+		if(c)
+			++count;
+		c=conf_next();
+	}
+	if(copy)
+		*buf++=0;
+	return(c==';' ? -count : count);
+}
+
+
+int getdigit()
+{
+	int c=-1;
+	c=conf_next();
+	if(!c || c==',' || c==';')
+		c=-1;
+	else
+	{
+		if(c>'9')
+			c=c+10-'A';
+		else
+			c-='0';
+	}
+	return(c);	
+}
+
 /* Upload data to FPGA */
 
 fileTYPE file;
@@ -138,17 +191,17 @@ static void scrollroms(int row);
 
 static char romfilenames[7][30];
 
-static struct menu_entry rommenu[]=
+static struct menu_entry menu[]=
 {
-	{MENU_ENTRY_CALLBACK,romfilenames[0],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_CALLBACK,romfilenames[1],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_CALLBACK,romfilenames[2],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_CALLBACK,romfilenames[3],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_CALLBACK,romfilenames[4],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_CALLBACK,romfilenames[5],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_CALLBACK,romfilenames[6],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_SUBMENU,"Back",MENU_ACTION(topmenu)},
-	{MENU_ENTRY_NULL,0,MENU_ACTION(scrollroms)}
+	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[0],MENU_ACTION(&selectrom)},
+	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[1],MENU_ACTION(&selectrom)},
+	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[2],MENU_ACTION(&selectrom)},
+	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[3],MENU_ACTION(&selectrom)},
+	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[4],MENU_ACTION(&selectrom)},
+	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[5],MENU_ACTION(&selectrom)},
+	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[6],MENU_ACTION(&selectrom)},
+	{MENU_ENTRY_SUBMENU,0,0,0,"Back",MENU_ACTION(menu)},
+	{MENU_ENTRY_NULL,0,0,0,0,MENU_ACTION(scrollroms)}
 };
 
 
@@ -236,7 +289,7 @@ static void listroms()
 			if(p->Attributes&ATTR_DIRECTORY)
 			{
 				printf("Found directory\n");
-				rommenu[j].action=MENU_ACTION(&selectdir);
+				menu[j].action=MENU_ACTION(&selectdir);
 				romfilenames[j][0]=FONT_ARROW_RIGHT; // Right arrow
 				romfilenames[j][1]=' ';
 				if(longfilename[0])
@@ -247,7 +300,7 @@ static void listroms()
 			else
 			{
 				printf("Found file\n");
-				rommenu[j].action=MENU_ACTION(&selectrom);
+				menu[j].action=MENU_ACTION(&selectrom);
 				if(longfilename[0])
 					strncpy(romfilenames[j++],longfilename,28);
 				else
@@ -285,40 +338,136 @@ static void showrommenu(int row)
 {
 	romindex=0;
 	listroms();
-	Menu_Set(rommenu);
-//	Menu_SetHotKeys(hotkeys);
+	Menu_Set(menu);
 }
 
 
-static char *video_labels[]=
+int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 {
-	"VGA - 31KHz, 60Hz",
-	"TV - 480i, 60Hz"
-};
+	int c;
+	int maxpage=0;
+	int line=0;
+	char *title;
 
+	SPI(0xff);
+	SPI_ENABLE(HW_SPI_CONF);
+	SPI(SPI_CONF_READ); // Read conf string command
 
-static char *scanline_labels[]=
-{
-	"Scanlines: Off",
-	"Scanlines: 25%",
-	"Scanlines: 50%",
-	"Scanlines: 75%"
-};
+	conf_nextfield(); /* Skip over core name */
+	c=conf_nextfield(); /* Skip over core file extensions */
+	while(c && line<limit)
+	{
+		c=conf_next();
+		switch(c)
+		{
+			case 'F':
+				{
+					int i=0;
+					c=conf_next(); /* Step over first comma */
+					if(selpage==0)
+					{
+						while((exts[i++]=conf_next())!=',')
+							;
+						exts[i-1]=0;
+						strcpy(menu[line].label,"Load");
+						menu[line].action=MENU_ACTION(&listroms);
+						++line;
+					}
+//					printf("File selector, extensions %s\n",exts);
+					c=conf_nextfield();
+				}
+				break;
+			case 'P':
+				{
+					int page;
+					page=getdigit();
 
+//					printf("Page %d\n",page);
 
-static struct menu_entry topmenu[]=
-{
-	{MENU_ENTRY_CALLBACK,"Reset",MENU_ACTION(&reset)},
-	{MENU_ENTRY_CALLBACK,"Save settings",MENU_ACTION(&SaveSettings)},
-	{MENU_ENTRY_CYCLE,(char *)video_labels,2},
-	{MENU_ENTRY_CYCLE,(char *)scanline_labels,4},
-	{MENU_ENTRY_TOGGLE,"Video filter",0},
-//	{MENU_ENTRY_CYCLE,(char *)cart_labels,2},
-	{MENU_ENTRY_CALLBACK,"Load ROM \x81",MENU_ACTION(&showrommenu)},
-//	{MENU_ENTRY_CALLBACK,"Debug \x10",MENU_ACTION(&debugmode)},
-	{MENU_ENTRY_CALLBACK,"Exit",MENU_ACTION(&MenuHide)},
-	{MENU_ENTRY_NULL,0,0}
-};
+					if(page>maxpage)
+						maxpage=page;
+					c=getdigit();
+
+					if(c<0)
+					{
+						/* Is this a submenu declaration? */
+						if(selpage==0)
+						{
+							title=menu[line].label;
+							menu[line].val=page;
+							c=conf_next();
+							while(c && c!=';')
+							{
+								*title++=c;
+								c=conf_next();
+							}
+							*title++=' ';
+							*title++='-';
+							*title++='>';
+							*title++=0;
+							line++;
+						}
+						else
+							c=conf_nextfield();
+					}
+					else if (page==selpage)
+					{
+						/* Must be a submenu entry */
+						int low,high=0;
+						int opt=0;
+						int mask;
+
+						/* Parse option */
+						low=getdigit();
+						high=getdigit();
+
+						if(high<0)
+							high=low;
+						else
+							conf_next();
+
+						mask=(1<<(1+high-low))-1;
+						menu[line].shift=low;
+						menu[line].val=(statusword>>low)&mask;
+
+						title=menu[line].label;
+//						printf("selpage %d, page %d\n",selpage,page);
+						if((c=copytocomma(title,LINELENGTH,selpage==page))>0)
+						{
+							if(c>0)
+								title+=c;
+							strncpy(title,": ",menu[line].label+LINELENGTH-title);
+							title+=2;
+							do
+							{
+								++opt;
+							} while(copytocomma(title,menu[line].label+LINELENGTH-title,opt==menu[line].val+1)>0);
+						}
+//						printf("Decoded %d options\n",opt);
+						menu[line].limit=opt;
+						++line;
+					}
+					else
+						c=conf_nextfield();
+				}
+				break;
+			default:
+				c=conf_nextfield();
+				break;
+		}
+	}
+	for(;line<8;++line)
+	{
+		*menu[line].label=0;
+	}
+	if(selpage)
+	{
+		strcpy(menu[7].label,"Back");
+	}
+//	printf("Maxpage %d\n",maxpage);
+	SPI_DISABLE(HW_SPI_CONF);
+	return(maxpage);
+}
 
 
 char filename[16];
@@ -333,49 +482,12 @@ int main(int argc,char **argv)
 	filename[0]=0;
 
 	SPI(0xff);
-	SPI_ENABLE(HW_SPI_CONF);
-	SPI(SPI_CONF_READ); // Read conf string command
-	i=0;
-	while(c=SPI(0xff))
-	{
-		filename[i]=c;
-//		spin();
-		putchar(c);
-
-#if 0
-		if(c==';')
-		{
-			if(i<8)
-			{
-				for(;i<8;++i)
-					filename[i]=' ';
-			}
-			else if(i>8)
-			{
-				filename[6]='~';
-				filename[7]='1';
-			}
-			filename[8]='R';
-			filename[9]='O';
-			filename[10]='M';
-			filename[11]=0;
-			break;
-		}
-		++i;
-#endif
-	}
-	while(c=SPI(0xff))
-		;
-	SPI_DISABLE(HW_SPI_CONF);
-
-//	spin();
-//	puts(filename);
-
 	puts("Initializing SD card\n");
-	havesd=spi_init() && FindDrive();
-	printf("Have SD? %d\n",havesd);
+	if(havesd=spi_init() && FindDrive())
+		puts("Have SD\n");
 
-	Menu_Set(topmenu);
+	parseconf(0,menu,0,8);
+	Menu_Set(menu);
 
 	EnableInterrupts();
 	while(1)
