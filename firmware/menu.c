@@ -34,7 +34,7 @@ void Menu_Draw(int currentrow)
 	char tmp[64];
 	struct menu_entry *m=menu;
 	menurows=0;
-	printf("Highlight row %d\n",currentrow);
+//	printf("Highlight row %d\n",currentrow);
 	while(m->type!=MENU_ENTRY_NULL)
 	{
 		int i;

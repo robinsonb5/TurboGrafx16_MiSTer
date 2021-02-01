@@ -182,12 +182,12 @@ void spin()
 		t=HW_SPI(HW_SPI_CS);
 }
 
-static struct menu_entry topmenu[];
-
 int romindex;
 static void listroms();
 static void selectrom(int row);
 static void scrollroms(int row);
+void buildmenu(int page,int offset);
+static void submenu(int row);
 
 static char romfilenames[7][30];
 
@@ -200,7 +200,7 @@ static struct menu_entry menu[]=
 	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[4],MENU_ACTION(&selectrom)},
 	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[5],MENU_ACTION(&selectrom)},
 	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[6],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_SUBMENU,0,0,0,"Back",MENU_ACTION(menu)},
+	{MENU_ENTRY_CALLBACK,0,0,0,"Back",MENU_ACTION(submenu)},
 	{MENU_ENTRY_NULL,0,0,0,0,MENU_ACTION(scrollroms)}
 };
 
@@ -227,7 +227,8 @@ static void selectrom(int row)
 		strncpy(longfilename,p->Name,11); // Make use of the long filename buffer to store a temporary copy of the filename,
 		LoadROM(longfilename);	// since loading it by name will overwrite the sector buffer which currently contains it!
 	}
-	Menu_Set(topmenu);
+	
+	Menu_Set(menu);
 	Menu_Hide();
 }
 
@@ -239,7 +240,6 @@ static void selectdir(int row)
 		ChangeDirectory(p);
 	romindex=0;
 	listroms();
-	Menu_Draw();
 }
 
 
@@ -264,11 +264,10 @@ static void scrollroms(int row)
 			break;
 	}
 	listroms();
-	Menu_Draw();
 }
 
 
-static void listroms()
+static void listroms(int row)
 {
 	int i,j;
 	j=0;
@@ -312,6 +311,7 @@ static void listroms()
 	}
 	for(;j<7;++j)
 		romfilenames[j][0]=0;
+	Menu_Draw();
 }
 
 
@@ -341,6 +341,14 @@ static void showrommenu(int row)
 	Menu_Set(menu);
 }
 
+
+static void submenu(int row)
+{
+	int page=menu[row].val;
+	puts("submenu callback");
+	putchar(row+'0');
+	buildmenu(page,0);
+}
 
 int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 {
@@ -395,6 +403,8 @@ int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 						{
 							title=menu[line].label;
 							menu[line].val=page;
+							menu[line].type=MENU_ENTRY_CALLBACK;
+							menu[line].action=MENU_ACTION(&submenu);
 							c=conf_next();
 							while(c && c!=';')
 							{
@@ -470,6 +480,13 @@ int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 }
 
 
+void buildmenu(int page,int offset)
+{
+	parseconf(page,menu,0,8);
+	Menu_Set(menu);
+}
+
+
 char filename[16];
 int main(int argc,char **argv)
 {
@@ -486,8 +503,7 @@ int main(int argc,char **argv)
 	if(havesd=spi_init() && FindDrive())
 		puts("Have SD\n");
 
-	parseconf(0,menu,0,8);
-	Menu_Set(menu);
+	buildmenu(0,0);
 
 	EnableInterrupts();
 	while(1)
