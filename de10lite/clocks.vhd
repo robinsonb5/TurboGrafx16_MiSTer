@@ -167,14 +167,14 @@ BEGIN
 		clk0_divide_by => 25,
 		clk0_duty_cycle => 50,
 		clk0_multiply_by => 64,
-		clk0_phase_shift => "-2600",
+		clk0_phase_shift => "-3000",
 		clk1_divide_by => 25,
 		clk1_duty_cycle => 50,
 		clk1_multiply_by => 64,
 		clk1_phase_shift => "0",
-		clk2_divide_by => 25000000,
+		clk2_divide_by => 50000000,
 		clk2_duty_cycle => 50,
-		clk2_multiply_by => 21333333,
+		clk2_multiply_by => 42666667,
 		clk2_phase_shift => "0",
 		clk3_divide_by => 50000000,
 		clk3_duty_cycle => 50,
@@ -320,7 +320,7 @@ END SYN;
 -- Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT3 STRING "MHz"
 -- Retrieval info: PRIVATE: PHASE_RECONFIG_FEATURE_ENABLED STRING "1"
 -- Retrieval info: PRIVATE: PHASE_RECONFIG_INPUTS_CHECK STRING "0"
--- Retrieval info: PRIVATE: PHASE_SHIFT0 STRING "-2.60000000"
+-- Retrieval info: PRIVATE: PHASE_SHIFT0 STRING "-3.00000000"
 -- Retrieval info: PRIVATE: PHASE_SHIFT1 STRING "0.00000000"
 -- Retrieval info: PRIVATE: PHASE_SHIFT2 STRING "0.00000000"
 -- Retrieval info: PRIVATE: PHASE_SHIFT3 STRING "0.00000000"
@@ -373,14 +373,14 @@ END SYN;
 -- Retrieval info: CONSTANT: CLK0_DIVIDE_BY NUMERIC "25"
 -- Retrieval info: CONSTANT: CLK0_DUTY_CYCLE NUMERIC "50"
 -- Retrieval info: CONSTANT: CLK0_MULTIPLY_BY NUMERIC "64"
--- Retrieval info: CONSTANT: CLK0_PHASE_SHIFT STRING "-2600"
+-- Retrieval info: CONSTANT: CLK0_PHASE_SHIFT STRING "-3000"
 -- Retrieval info: CONSTANT: CLK1_DIVIDE_BY NUMERIC "25"
 -- Retrieval info: CONSTANT: CLK1_DUTY_CYCLE NUMERIC "50"
 -- Retrieval info: CONSTANT: CLK1_MULTIPLY_BY NUMERIC "64"
 -- Retrieval info: CONSTANT: CLK1_PHASE_SHIFT STRING "0"
--- Retrieval info: CONSTANT: CLK2_DIVIDE_BY NUMERIC "25000000"
+-- Retrieval info: CONSTANT: CLK2_DIVIDE_BY NUMERIC "50000000"
 -- Retrieval info: CONSTANT: CLK2_DUTY_CYCLE NUMERIC "50"
--- Retrieval info: CONSTANT: CLK2_MULTIPLY_BY NUMERIC "21333333"
+-- Retrieval info: CONSTANT: CLK2_MULTIPLY_BY NUMERIC "42666667"
 -- Retrieval info: CONSTANT: CLK2_PHASE_SHIFT STRING "0"
 -- Retrieval info: CONSTANT: CLK3_DIVIDE_BY NUMERIC "50000000"
 -- Retrieval info: CONSTANT: CLK3_DUTY_CYCLE NUMERIC "50"
