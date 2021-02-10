@@ -295,17 +295,17 @@ begin
 -- -----------------------------------------------------------------------
 	my1Mhz : entity work.chameleon_1mhz
 		generic map (
-			clk_ticks_per_usec => 85
+			clk_ticks_per_usec => 42
 		)
 		port map (
-			clk => clk_85,
+			clk => clk_sys,
 			ena_1mhz => ena_1mhz,
 			ena_1mhz_2 => open
 		);
 
 	my1Khz : entity work.chameleon_1khz
 		port map (
-			clk => clk_85,
+			clk => clk_sys,
 			ena_1mhz => ena_1mhz,
 			ena_1khz => ena_1khz
 		);
@@ -315,7 +315,7 @@ begin
 -- -----------------------------------------------------------------------
 	io_ps2iec_inst : entity work.chameleon2_io_ps2iec
 		port map (
-			clk => clk_85,
+			clk => clk_sys,
 
 			ps2iec_sel => ps2iec_sel,
 			ps2iec => ps2iec,
@@ -336,7 +336,7 @@ begin
 -- -----------------------------------------------------------------------
 	io_shiftreg_inst : entity work.chameleon2_io_shiftreg
 		port map (
-			clk => clk_85,
+			clk => clk_sys,
 
 			ser_out_clk => ser_out_clk,
 			ser_out_dat => ser_out_dat,
@@ -354,7 +354,7 @@ begin
 
 	cdtv : entity work.chameleon_cdtv_remote
 	port map(
-		clk => clk_85,
+		clk => clk_sys,
 		ena_1mhz => ena_1mhz,
 		ir => ir,
 		key_power => power_button,
@@ -377,7 +377,7 @@ begin
 				enable_c64_4player => true
 			)
 			port map (
-				clk => clk_85,
+				clk => clk_sys,
 				ena_1mhz => ena_1mhz,
 				phi2_n => phi2_n,
 				dotclock_n => dotclk_n,
@@ -430,9 +430,9 @@ begin
 	end block;
 
 -- Synchronise IR signal
-process (clk_85)
+process (clk_sys)
 begin
-	if rising_edge(clk_85) then
+	if rising_edge(clk_sys) then
 		ir_d<=ir_data;
 		ir<=ir_d;
 	end if;

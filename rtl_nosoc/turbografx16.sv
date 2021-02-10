@@ -298,14 +298,6 @@ always @(posedge clk_sys) begin
 
 end
 
-reg vram0_rdD;
-reg [15:1] prev_vram0_addr;
-wire vram0_early_req = vram0_rdD && prev_vram0_addr!=vram0_addr_sd ? 1'b1 : 1'b0;
-
-reg vram1_rdD;
-reg [15:1] prev_vram1_addr;
-wire vram1_early_req = vram1_rdD && prev_vram1_addr!=vram1_addr_sd ? 1'b1 : 1'b0;
-
 always @(posedge clk_mem) begin
 /*
 		bsram_rdD <= bsram_rd;
@@ -316,29 +308,20 @@ always @(posedge clk_mem) begin
 			bsram_din <= BSRAM_D;
 		end
 */
-	vram0_rdD <= VRAM0_RD;
-	vram0_weD <= VRAM0_WE;
-	if (((~vram0_weD & VRAM0_WE) || vram0_early_req)) begin
-//	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
-//		vram0_addr_sd <= VRAM0_ADDR[15:1];
-//		vram0_din <= VRAM0_D;
-		vram0_req <= ~vram0_req;
-	end
-	prev_vram0_addr<=vram0_addr_sd;
-	vram0_addr_sd <= VRAM0_ADDR[15:1];
-	vram0_din <= VRAM0_D;
 
-	vram1_rdD <= VRAM1_RD;
-	vram1_weD <= VRAM1_WE;
-	if (((~vram1_weD & VRAM1_WE) || vram1_early_req)) begin
-//	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
-//		vram1_addr_sd <= VRAM1_ADDR[15:1];
-//		vram1_din <= VRAM1_D;
-		vram1_req <= ~vram1_req;
+	vram0_weD <= VRAM0_WE;
+	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
+		vram0_req <= ~vram0_req;
+		vram0_din <= VRAM0_D;
+		vram0_addr_sd <= VRAM0_ADDR[15:1];
 	end
-	prev_vram1_addr<=vram1_addr_sd;
-	vram1_addr_sd <= VRAM1_ADDR[15:1];
-	vram1_din <= VRAM1_D;
+
+	vram1_weD <= VRAM1_WE;
+	if (((~vram1_weD & VRAM1_WE) || (VRAM1_RD && VRAM1_ADDR[15:1] != vram1_addr_sd))) begin
+		vram1_req <= ~vram1_req;
+		vram1_din <= VRAM1_D;
+		vram1_addr_sd <= VRAM1_ADDR[15:1];
+	end
 
 end
 
@@ -380,14 +363,14 @@ sdram sdram
 	.bsram_io_req_ack(),
 	.bsram_io_we(bk_load),
 
-	.vram0_req(vram0_req ^ vram0_early_req),
+	.vram0_req(vram0_req),
 	.vram0_ack(),
 	.vram0_addr(vram0_addr_sd),
 	.vram0_din(vram0_din),
 	.vram0_dout(VRAM0_Q),
 	.vram0_we(vram0_weD),
 
-	.vram1_req(vram1_req ^ vram1_early_req),
+	.vram1_req(vram1_req),
 	.vram1_ack(),
 	.vram1_addr(vram1_addr_sd),
 	.vram1_din(vram1_din),

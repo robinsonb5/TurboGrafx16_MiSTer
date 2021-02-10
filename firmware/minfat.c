@@ -399,7 +399,7 @@ void ChangeDirectory(DIRENTRY *p)
 }
 
 
-DIRENTRY *NextDirEntry(int prev)
+DIRENTRY *NextDirEntry(int prev,int (*matchfunc)(const char *fn))
 {
     unsigned long  iDirectory = 0;       // only root directory is supported
     DIRENTRY      *pEntry = NULL;        // pointer to current entry in sector buffer
@@ -418,25 +418,17 @@ DIRENTRY *NextDirEntry(int prev)
 	pEntry = (DIRENTRY*)sector_buffer;
 	pEntry+=(prev&0xf);
 
+	// FIXME - this will stop at a deleted file?
 	if (pEntry->Name[0] != SLOT_EMPTY && pEntry->Name[0] != SLOT_DELETED) // valid entry??
 	{
-		if (!(pEntry->Attributes & ATTR_VOLUME)) // not a volume
-		{
-			if(!prevlfn)
-				longfilename[0]=0;
-			prevlfn=0;
-			// FIXME - should check the lfn checksum here.
-			printf("prevlfn: %d, file %s, %s\n",prevlfn,longfilename,pEntry->Name);
-			return(pEntry);
-		}
 #ifndef DISABLE_LONG_FILENAMES
-		else if (pEntry->Attributes == ATTR_LFN)	// Do we have a long filename entry?
+		if (pEntry->Attributes == ATTR_LFN)	// Do we have a long filename entry?
 		{
 			unsigned char *p=&pEntry->Name[0];
 			int seq=p[0];
 			int offset=((seq&0x1f)-1)*13;
 			char *o=&longfilename[offset];
-			printf("lfn %s, %d, %d\n",pEntry->Name,seq,offset);
+//			printf("lfn %s, %d, %d\n",pEntry->Name,seq,offset);
 			*o++=p[1];
 			*o++=p[3];
 			*o++=p[5];
@@ -453,8 +445,17 @@ DIRENTRY *NextDirEntry(int prev)
 			*o++=p[0x1c];
 			*o++=p[0x1e];
 			prevlfn=1;
-		}
+		} else
 #endif
+		if ((!(pEntry->Attributes & ATTR_VOLUME)) && ( (pEntry->Attributes & ATTR_DIRECTORY) || (!matchfunc) || matchfunc(&pEntry->Name)))
+		{
+			if(!prevlfn)
+				longfilename[0]=0;
+			prevlfn=0;
+			// FIXME - should check the lfn checksum here.
+//			printf("prevlfn: %d, file %s, %s\n",prevlfn,longfilename,pEntry->Name);
+			return(pEntry);
+		}
 	}
 	return((DIRENTRY *)0);
 }

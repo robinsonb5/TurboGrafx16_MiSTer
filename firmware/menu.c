@@ -34,7 +34,7 @@ void Menu_Draw(int currentrow)
 	char tmp[64];
 	struct menu_entry *m=menu;
 	menurows=0;
-//	printf("Highlight row %d\n",currentrow);
+	printf("Highlight row %d\n",currentrow);
 	while(m->type!=MENU_ENTRY_NULL)
 	{
 		int i;
@@ -43,6 +43,7 @@ void Menu_Draw(int currentrow)
 		OsdPutChar(' ');
 		switch(m->type)
 		{
+#if 0
 			case MENU_ENTRY_CYCLE:
 				i=MENU_CYCLE_VALUE(m);	// Access the first byte
 				labels=(char**)m->label;
@@ -50,12 +51,11 @@ void Menu_Draw(int currentrow)
 				OsdPutChar(' ');
 				OsdPuts(labels[i]);
 				break;
-#if 0
+
 			case MENU_ENTRY_SLIDER:
 				DrawSlider(m);
 				OsdPuts(m->label);
 				break;
-#endif
 			case MENU_ENTRY_TOGGLE:
 				if((menu_toggle_bits>>MENU_ACTION_TOGGLE(m->action))&1)
 					OsdPutChar(FONT_CHECKMARK);
@@ -63,6 +63,7 @@ void Menu_Draw(int currentrow)
 					OsdPutChar(FONT_CROSS);
 				OsdPutChar(' ');
 				// Fall through
+#endif
 			default:
 				OsdPuts(m->label);
 				break;
@@ -78,6 +79,7 @@ void Menu_Draw(int currentrow)
 		OsdWriteEnd();
 		++i;
 	}
+	printf("Menu has %d rows\n",menurows);
 }
 
 
@@ -154,7 +156,7 @@ int Menu_Run()
 	struct menu_entry *m=menu;
 	struct hotkey *hk=hotkeys;
 
-	if((TestKey(KEY_F12)&2)==2)
+	if(TestKey(KEY_F12)&2)
 	{
 		OsdShowHide(menu_visible^=1);
 		upd=1;
@@ -247,9 +249,10 @@ int Menu_Run()
 	}
 #endif
 
-	if(TestKey(KEY_ENTER)&2)
+	if(i=TestKey(KEY_ENTER)&2)
 	{
 		struct menu_entry *m=menu;
+		printf("Enter detected %d - currentrow %d\n",i,currentrow);
 		i=currentrow;
 		while(i>0)
 		{
@@ -262,6 +265,7 @@ int Menu_Run()
 				Menu_Set(MENU_ACTION_SUBMENU(m->action));
 				break;
 			case MENU_ENTRY_CALLBACK:
+				printf("Callback %x\n",m->action);
 				MENU_ACTION_CALLBACK(m->action)(currentrow);
 				break;
 			case MENU_ENTRY_TOGGLE:

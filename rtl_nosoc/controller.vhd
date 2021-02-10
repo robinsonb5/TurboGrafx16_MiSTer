@@ -1,7 +1,6 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.numeric_std.ALL;
-use work.rom_pkg.ALL;
 
 entity controller is
 	generic (
@@ -131,12 +130,14 @@ signal from_mem : std_logic_vector(31 downto 0);
 signal cpu_addr : std_logic_vector(31 downto 0);
 signal to_cpu : std_logic_vector(31 downto 0);
 signal from_cpu : std_logic_vector(31 downto 0);
+signal from_rom : std_logic_vector(31 downto 0);
 signal cpu_req : std_logic; 
 signal cpu_ack : std_logic; 
 signal cpu_wr : std_logic; 
 signal cpu_bytesel : std_logic_vector(3 downto 0);
 signal mem_rd : std_logic; 
 signal mem_wr : std_logic; 
+signal rom_wr : std_logic;
 signal mem_rd_d : std_logic; 
 signal mem_wr_d : std_logic; 
 signal cache_valid : std_logic;
@@ -148,9 +149,6 @@ signal upload_addr : unsigned(24 downto 0);
 signal upload_data : std_logic_vector(7 downto 0);
 signal upload_req : std_logic;
 signal upload_ack : std_logic;
-
-signal to_rom : ToROM;
-signal from_rom : FromROM;
 
 -- CPU Debug signals
 signal debug_req : std_logic;
@@ -341,12 +339,15 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 
 	rom : entity work.controller_rom
 	generic map(
-		maxAddrBitBRAM => 13
+		ADDR_WIDTH => 12
 	)
 	port map(
 		clk => clk,
-		from_soc => to_rom,
-		to_soc => from_rom
+		addr => cpu_addr(13 downto 2),
+		d => from_cpu,
+		q => from_rom,
+		we => rom_wr,
+		bytesel => cpu_bytesel
 	);
 
 
@@ -355,10 +356,6 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 	mem_rom <='1' when cpu_addr(31 downto 26)=X"0"&"00" else '0';
 	mem_rd<='1' when cpu_req='1' and cpu_wr='0' and mem_rom='0' else '0';
 	mem_wr<='1' when cpu_req='1' and cpu_wr='1' and mem_rom='0' else '0';
-
-	to_rom.MemAAddr<=cpu_addr(15 downto 2);
-	to_rom.MemAWrite<=from_cpu;
-	to_rom.MemAByteSel<=cpu_bytesel;
 		
 	process(clk)
 	begin
@@ -366,7 +363,7 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 			rom_ack<=cpu_req and mem_rom;
 
 			if mem_rom='1' and cpu_req='1' then
-				to_cpu<=from_rom.MemARead;
+				to_cpu<=from_rom;
 			else
 				to_cpu<=from_mem;
 			end if;
@@ -378,9 +375,9 @@ int_triggers<=(0=>timer_tick, 1=>ps2_int, others => '0');
 			end if;
 
 			if mem_rom='1' then
-				to_rom.MemAWriteEnable<=(cpu_wr and cpu_req);
+				rom_wr<=(cpu_wr and cpu_req);
 			else
-				to_rom.MemAWriteEnable<='0';
+				rom_wr<='0';
 			end if;
 	
 		end if;	

@@ -15,14 +15,14 @@ set clk_fast  "clocks|altpll_component|auto_generated|pll1|clk[1]"
 set clk_slow  "clocks|altpll_component|auto_generated|pll1|clk[2]"
 
 # generated clocks
-create_generated_clock -name clk_sdram -source [get_pins {clocks|altpll_component|auto_generated|pll1|clk[0]}] [get_ports {sd_clk}]
+create_generated_clock -name clk_sdram -source [get_pins {clocks|altpll_component|auto_generated|pll1|clk[0]}] [get_ports {ram_clk}]
 create_generated_clock -name clk_spi -source [get_pins $clk_fast] -divide_by 4 [get_nets {controller:controller|spi_controller:spi|sck}]
 
 
 # name SDRAM ports
-set sdram_outputs [get_ports {sd_addr[*] sd_ldqm sd_udqm sd_we_n sd_cas_n sd_ras_n sd_ba_* }]
-set sdram_dqoutputs [get_ports {sd_data[*]}]
-set sdram_inputs  [get_ports {sd_data[*]}]
+set sdram_outputs [get_ports {ram_addr[*] ram_ldqm ram_udqm ram_we_n ram_cas_n ram_ras_n ram_ba_* }]
+set sdram_dqoutputs [get_ports {ram_data[*]}]
+set sdram_inputs  [get_ports {ram_data[*]}]
 
 
 # clock groups
@@ -63,13 +63,13 @@ set_false_path -from {gen_reset:myReset|nreset*} -to {reset_28}
 set_false_path -from [get_clocks {clocks|altpll_component|auto_generated|pll1|clk[1]}] -to [get_clocks {clk_spi}]
 set_false_path -from [get_clocks {clocks|altpll_component|auto_generated|pll1|clk[2]}] -to [get_clocks {clk_spi}]
 set_false_path -from [get_clocks {clk_spi}] -to [get_clocks {clocks|altpll_component|auto_generated|pll1|clk[1]}]
-set_false_path -from {clocks|altpll_component|auto_generated|pll1|clk[2]} -to {sd_clk}
+set_false_path -from {clocks|altpll_component|auto_generated|pll1|clk[2]} -to {ram_clk}
 
 set_false_path -to {sigma*}
 set_false_path -to {red[*]}
 set_false_path -to {grn[*]}
 set_false_path -to {blu[*]}
-set_false_path -to {n*Sync}
+set_false_path -to {*sync_n}
 
 # multicycle paths
 

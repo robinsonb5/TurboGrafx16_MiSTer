@@ -27,7 +27,8 @@
 
 int statusword; /* Support 32-bit status word initially - need to be 64-bit in the long run */
 #define LINELENGTH 32
-char exts[32];
+int menupage;
+int romtype;
 
 #define conf_next() SPI(0xff)
 
@@ -64,19 +65,73 @@ int copytocomma(char *buf, int limit,int copy)
 
 int getdigit()
 {
-	int c=-1;
-	c=conf_next();
-	if(!c || c==',' || c==';')
-		c=-1;
-	else
-	{
-		if(c>'9')
-			c=c+10-'A';
-		else
-			c-='0';
-	}
+	int c=conf_next();
+//	printf("Getdigit %c\n",c);
+	if(c>='0' && c<='9')
+		c-='0';
+	if(c>='A' && c<='F')
+		c-='A'-10;
 	return(c);	
 }
+
+
+int matchextension(const char *ext)
+{
+	int done=0;
+	int i=0;
+	int c=1;
+	int c1,c2,c3;
+
+	SPI(0xff);
+	SPI_ENABLE(HW_SPI_CONF);
+	SPI(SPI_CONF_READ); // Read conf string command
+	
+	printf("Matching %s with romtype %d\n",ext,romtype);
+
+	if(c=conf_nextfield())
+	{
+		c1=conf_next();
+		if(c1==';' || romtype )
+		{
+			done=1;
+			while(c)
+			{
+				if(c!=';')
+					conf_nextfield();
+				c=conf_next();
+			//		printf("c: %c\n",c);
+				if(c=='F')
+				{
+					conf_next();
+					c1=conf_next();
+					c=0;
+					done=0;
+				}
+			}
+		}
+	}
+
+	// c1 will already have been read
+	while(!done)
+	{
+		c2=conf_next();
+		c3=conf_next();
+//		printf("%d, %d, %d, %d, %d, %d\n",c1,c2,c3,ext[8],ext[9],ext[10]);
+		++i;
+		if(c1==ext[8] && c2==ext[9] && c3==ext[10])
+			done=1;
+		else if(c1==',' || c1==';')
+		{
+			i=0;
+			done=1;
+		}
+		c1=conf_next();
+	}
+	SPI_DISABLE(HW_SPI_CONF);
+	printf("Second match result %d\n",done);
+	return(i);
+}
+
 
 /* Upload data to FPGA */
 
@@ -125,7 +180,15 @@ int LoadROM(const char *fn)
 	{
 		int imgsize=file.size;
 		int sendsize;
-		puts("Opened file, loading...\n");
+		int extindex=matchextension(fn); /* Figure out which extension matches, and thus which index we need to use */
+		printf("Opened file, loading %s, (idx %d)...\n",fn+8,extindex);
+
+		SPI_ENABLE(HW_SPI_FPGA);
+		SPI(SPI_FPGA_FILE_INDEX);
+		SPI((romtype+1)|((extindex-1)<<6)); /* Set ROM index */
+		SPI_DISABLE(HW_SPI_FPGA);
+
+		SPI(0xFF);
 
 		SPI_ENABLE(HW_SPI_FPGA);
 		SPI(SPI_FPGA_FILE_TX);
@@ -135,7 +198,8 @@ int LoadROM(const char *fn)
 		while(imgsize)
 		{
 			char *buf=sector_buffer;
-			if(!FileRead(&file,0))//sector_buffer))
+//			if(!FileRead(&file,0))//sector_buffer))
+			if(!FileRead(&file,sector_buffer))
 				return(0);
 
 			if(imgsize>=512)
@@ -148,7 +212,7 @@ int LoadROM(const char *fn)
 				sendsize=imgsize;
 				imgsize=0;
 			}
-/*
+
 			SPI_ENABLE(HW_SPI_FPGA|HW_SPI_FAST);
 			SPI(SPI_FPGA_FILE_TX_DAT);
 			while(sendsize--)
@@ -156,11 +220,11 @@ int LoadROM(const char *fn)
 				SPI(*buf++);
 			}
 			SPI_DISABLE(HW_SPI_FPGA);
-*/
+
 			FileNextSector(&file);
 		}
 
-		VerifyROM();
+//		VerifyROM();
 		SPI_ENABLE(HW_SPI_FPGA);
 		SPI(SPI_FPGA_FILE_TX);
 		SPI(0x00);
@@ -184,9 +248,9 @@ void spin()
 
 int romindex;
 static void listroms();
-static void selectrom(int row);
+void selectrom(int row);
 static void scrollroms(int row);
-void buildmenu(int page,int offset);
+void buildmenu(int offset);
 static void submenu(int row);
 
 static char romfilenames[7][30];
@@ -200,7 +264,7 @@ static struct menu_entry menu[]=
 	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[4],MENU_ACTION(&selectrom)},
 	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[5],MENU_ACTION(&selectrom)},
 	{MENU_ENTRY_CALLBACK,0,0,0,romfilenames[6],MENU_ACTION(&selectrom)},
-	{MENU_ENTRY_CALLBACK,0,0,0,"Back",MENU_ACTION(submenu)},
+	{MENU_ENTRY_CALLBACK,0,0,0,0,MENU_ACTION(&submenu)},
 	{MENU_ENTRY_NULL,0,0,0,0,MENU_ACTION(scrollroms)}
 };
 
@@ -209,9 +273,11 @@ static DIRENTRY *nthfile(int n)
 {
 	int i,j=0;
 	DIRENTRY *p;
+	printf("Looking for file %d\n",n);
 	for(i=0;(j<=n) && (i<dir_entries);++i)
 	{
-		p=NextDirEntry(i);
+		printf("d\n");
+		p=NextDirEntry(i,matchextension);
 		if(p)
 			++j;
 	}
@@ -219,17 +285,21 @@ static DIRENTRY *nthfile(int n)
 }
 
 
-static void selectrom(int row)
+void selectrom(int row)
 {
-	DIRENTRY *p=nthfile(romindex+row);
-	if(p)
+	printf("Selected from %d + %d\n",romindex,row);
 	{
-		strncpy(longfilename,p->Name,11); // Make use of the long filename buffer to store a temporary copy of the filename,
-		LoadROM(longfilename);	// since loading it by name will overwrite the sector buffer which currently contains it!
-	}
+		DIRENTRY *p=nthfile(romindex+row);
+		printf("File %s\n",p->Name);
+		if(p)
+		{
+			strncpy(longfilename,p->Name,11); // Make use of the long filename buffer to store a temporary copy of the filename,
+			LoadROM(longfilename);	// since loading it by name will overwrite the sector buffer which currently contains it!
+		}
 	
-	Menu_Set(menu);
-	Menu_Hide();
+		Menu_Set(menu);
+		Menu_Hide();
+	}
 }
 
 
@@ -239,7 +309,7 @@ static void selectdir(int row)
 	if(p)
 		ChangeDirectory(p);
 	romindex=0;
-	listroms();
+	listroms(row);
 }
 
 
@@ -263,25 +333,27 @@ static void scrollroms(int row)
 			romindex+=16;
 			break;
 	}
-	listroms();
+	listroms(romtype);
 }
 
 
 static void listroms(int row)
 {
 	int i,j;
+	romtype=row;
+	printf("Setting romtype to %d\n",row);
 	j=0;
 	printf("listrom skipping %d, direntries %d \n",romindex,dir_entries);
 	for(i=0;(j<romindex) && (i<dir_entries);++i)
 	{
-		DIRENTRY *p=NextDirEntry(i);
+		DIRENTRY *p=NextDirEntry(i,matchextension);
 		if(p)
 			++j;
 	}
 
 	for(j=0;(j<7) && (i<dir_entries);++i)
 	{
-		DIRENTRY *p=NextDirEntry(i);
+		DIRENTRY *p=NextDirEntry(i,matchextension);
 		if(p)
 		{
 			// FIXME declare a global long file name buffer.
@@ -311,7 +383,12 @@ static void listroms(int row)
 	}
 	for(;j<7;++j)
 		romfilenames[j][0]=0;
-	Menu_Draw();
+	menu[7].val=0;
+	menu[7].type=MENU_ENTRY_CALLBACK;
+	menu[7].action=MENU_ACTION(&submenu);
+	menu[7].label="\x80 Back";
+	menu[8].action=MENU_ACTION(scrollroms);
+	Menu_Draw(row);
 }
 
 
@@ -337,22 +414,50 @@ static void MenuHide(int row)
 static void showrommenu(int row)
 {
 	romindex=0;
-	listroms();
+	listroms(row);
 	Menu_Set(menu);
 }
 
 
 static void submenu(int row)
 {
-	int page=menu[row].val;
+	menupage=menu[row].val;
 	puts("submenu callback");
 	putchar(row+'0');
-	buildmenu(page,0);
+	buildmenu(0);
 }
+
+
+static void cycle(int row)
+{
+	int v;
+	struct menu_entry *m=&menu[row];
+	v=(statusword>>m->shift);	// Extract value from existing statusword
+	v&=m->val;					// and mask...
+	++v;
+	if(v>=m->limit)
+		v=0;
+	statusword&=~(m->val<<m->shift); // Mask off old bits from status word
+	statusword|=v<<m->shift;		// and insert new value
+
+	SPI(0xff);
+	SPI_ENABLE(HW_SPI_CONF);
+	SPI(UIO_SET_STATUS2); // Read conf string command
+	SPI(statusword);
+	SPI(statusword>>8);
+	SPI(statusword>>16);
+	SPI(statusword>>24);
+	SPI_DISABLE(HW_SPI_CONF);
+
+	parseconf(menupage,menu,0,7);
+	Menu_Draw(row);
+}
+
 
 int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 {
 	int c;
+	int page=0;
 	int maxpage=0;
 	int line=0;
 	char *title;
@@ -362,127 +467,138 @@ int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 	SPI(SPI_CONF_READ); // Read conf string command
 
 	conf_nextfield(); /* Skip over core name */
-	c=conf_nextfield(); /* Skip over core file extensions */
+	c=conf_next();
+	printf("Next char %c\n",c);
+	if(c!=';')
+	{
+		strcpy(menu[line].label,"Load *. ");
+		menu[line].action=MENU_ACTION(&listroms);
+		menu[line].label[8]=c;
+		copytocomma(&menu[line].label[8],LINELENGTH-8,1);
+		++line;
+	}
 	while(c && line<limit)
 	{
 		c=conf_next();
 		switch(c)
 		{
 			case 'F':
+				if(!selpage)
 				{
-					int i=0;
-					c=conf_next(); /* Step over first comma */
-					if(selpage==0)
-					{
-						while((exts[i++]=conf_next())!=',')
-							;
-						exts[i-1]=0;
-						strcpy(menu[line].label,"Load");
-						menu[line].action=MENU_ACTION(&listroms);
-						++line;
-					}
-//					printf("File selector, extensions %s\n",exts);
-					c=conf_nextfield();
+					strcpy(menu[line].label,"Load");
+					menu[line].action=MENU_ACTION(&listroms);
+					++line;
 				}
+				c=conf_nextfield();
 				break;
 			case 'P':
+				page=getdigit();
+				printf("Page %d\n",page);
+
+				if(page>maxpage)
+					maxpage=page;
+				c=getdigit();
+				if(c==',')
 				{
-					int page;
-					page=getdigit();
-
-//					printf("Page %d\n",page);
-
-					if(page>maxpage)
-						maxpage=page;
-					c=getdigit();
-
-					if(c<0)
+					/* Is this a submenu declaration? */
+					if(selpage==0)
 					{
-						/* Is this a submenu declaration? */
-						if(selpage==0)
-						{
-							title=menu[line].label;
-							menu[line].val=page;
-							menu[line].type=MENU_ENTRY_CALLBACK;
-							menu[line].action=MENU_ACTION(&submenu);
-							c=conf_next();
-							while(c && c!=';')
-							{
-								*title++=c;
-								c=conf_next();
-							}
-							*title++=' ';
-							*title++='-';
-							*title++='>';
-							*title++=0;
-							line++;
-						}
-						else
-							c=conf_nextfield();
-					}
-					else if (page==selpage)
-					{
-						/* Must be a submenu entry */
-						int low,high=0;
-						int opt=0;
-						int mask;
-
-						/* Parse option */
-						low=getdigit();
-						high=getdigit();
-
-						if(high<0)
-							high=low;
-						else
-							conf_next();
-
-						mask=(1<<(1+high-low))-1;
-						menu[line].shift=low;
-						menu[line].val=(statusword>>low)&mask;
-
 						title=menu[line].label;
-//						printf("selpage %d, page %d\n",selpage,page);
-						if((c=copytocomma(title,LINELENGTH,selpage==page))>0)
+						menu[line].val=page;
+						menu[line].type=MENU_ENTRY_CALLBACK;
+						menu[line].action=MENU_ACTION(&submenu);
+						c=conf_next();
+						while(c && c!=';')
 						{
-							if(c>0)
-								title+=c;
-							strncpy(title,": ",menu[line].label+LINELENGTH-title);
-							title+=2;
-							do
-							{
-								++opt;
-							} while(copytocomma(title,menu[line].label+LINELENGTH-title,opt==menu[line].val+1)>0);
+							*title++=c;
+							c=conf_next();
 						}
-//						printf("Decoded %d options\n",opt);
-						menu[line].limit=opt;
-						++line;
+						*title++=' ';
+						*title++=FONT_ARROW_RIGHT;
+						*title++=0;
+						line++;
 					}
 					else
 						c=conf_nextfield();
+					break;
 				}
+				// Fall through to O
+			case 'O':
+				if (page==selpage)
+				{
+					/* Must be a submenu entry */
+					int low,high=0;
+					int opt=0;
+					int val;
+
+					/* Parse option */
+					low=getdigit();
+					high=getdigit();
+
+					if(high==',')
+						high=low;
+					else
+						conf_next();
+
+
+					menu[line].shift=low;
+					menu[line].val=(1<<(1+high-low))-1;
+					menu[line].type=MENU_ENTRY_CALLBACK;
+					menu[line].action=MENU_ACTION(&cycle);
+					val=(statusword>>low)&menu[line].val;
+//					printf("Statusword %x, shifting by %d: %x\n",statusword,low,menu[line].val);
+
+					title=menu[line].label;
+//					printf("selpage %d, page %d\n",selpage,page);
+					if((c=copytocomma(title,LINELENGTH,selpage==page))>0)
+					{
+						title+=c;
+						strncpy(title,": ",menu[line].label+LINELENGTH-title);
+						title+=2;
+						do
+						{
+							++opt;
+						} while(copytocomma(title,menu[line].label+LINELENGTH-title,opt==(val+1))>0);
+					}
+					printf("Decoded %d options\n",opt);
+					menu[line].limit=opt;
+					++line;
+				}
+				else
+					c=conf_nextfield();
 				break;
 			default:
 				c=conf_nextfield();
 				break;
 		}
 	}
-	for(;line<8;++line)
+	for(;line<7;++line)
 	{
 		*menu[line].label=0;
+		menu[line].action=0;
 	}
 	if(selpage)
 	{
-		strcpy(menu[7].label,"Back");
+		menu[7].val=0;
+		menu[7].type=MENU_ENTRY_CALLBACK;
+		menu[7].action=MENU_ACTION(&submenu);
+		menu[7].label="\x80 Back";
 	}
-//	printf("Maxpage %d\n",maxpage);
+	else
+	{
+		menu[7].label="\x80 Exit";
+		menu[7].action=MENU_ACTION(&Menu_Hide);
+	}
+//	menu[8].action=0;
+	printf("Maxpage %d\n",maxpage);
 	SPI_DISABLE(HW_SPI_CONF);
 	return(maxpage);
 }
 
 
-void buildmenu(int page,int offset)
+void buildmenu(int offset)
 {
-	parseconf(page,menu,0,8);
+	parseconf(menupage,menu,0,7);
 	Menu_Set(menu);
 }
 
@@ -503,7 +619,8 @@ int main(int argc,char **argv)
 	if(havesd=spi_init() && FindDrive())
 		puts("Have SD\n");
 
-	buildmenu(0,0);
+	menupage=0;
+	buildmenu(0);
 
 	EnableInterrupts();
 	while(1)

@@ -8,7 +8,7 @@ LIBDIR=$(832DIR)/lib832
 
 CFLAGS = -+ -O=1343 -size -unsigned-char
 ASFLAGS = -el
-LDFLAGS  = -el -s_STACKSIZE=0x300
+LDFLAGS  = -el -s_STACKSIZE=0x400
 
 START = $(LIBDIR)/crt0.a
 LIBS = $(LIBDIR)/libtiny832.a
@@ -29,9 +29,9 @@ clean :
 	-rm *.elf
 
 %_rom.vhd: %.bin $(ROMGEN)
-	sed 's/dualportram/$*_rom/' >$*_rom.vhd <$(ROMGENDIR)/rom_prologue.vhd
+	sed 's/eightthirtytwo_rom/$*_rom/' >$*_rom.vhd <$(ROMGENDIR)/rom_prologue_byte.vhd
 	$(ROMGEN) -b $*.bin >>$*_rom.vhd
-	cat >>$*_rom.vhd $(ROMGENDIR)/rom_epilogue.vhd
+	cat >>$*_rom.vhd $(ROMGENDIR)/rom_epilogue_byte.vhd
 	grep __bss_ $*.map
 
 controller.bin : $(START) $(LIBS) $(PRJ_OBJ)

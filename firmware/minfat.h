@@ -109,7 +109,8 @@ unsigned int FileRead(fileTYPE *file, unsigned char *pBuffer);
 
 int LoadFile(const char *fn, unsigned char *buf);
 
-DIRENTRY *NextDirEntry(int prev);
+void ChangeDirectory(DIRENTRY *p);
+DIRENTRY *NextDirEntry(int prev,int (*matchfunc)(const char *fn));
 extern unsigned int dir_entries;             // number of entry's in directory table
 extern char longfilename[260];
 
