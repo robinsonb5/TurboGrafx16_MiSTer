@@ -141,7 +141,7 @@ unsigned int FindDrive(void)
 
 		boot_sector = pe->startlba;
 		if(mbr->Signature==0x55aa)
-				boot_sector=SwapBBBB(pe->startlba);
+				boot_sector=ConvBBBB_LE(pe->startlba);
 		else if(mbr->Signature!=0xaa55)
 		{
 			puts("No partition signature found\n");
@@ -255,22 +255,19 @@ int GetCluster(int cluster)
 
 unsigned int FileOpen(fileTYPE *file, const char *name)
 {
-    uint32_t  iDirectory = 0;       // only root directory is supported
     DIRENTRY      *pEntry = NULL;        // pointer to current entry in sector buffer
     uint32_t  iDirectorySector;     // current sector of directory entries table
     uint32_t  iDirectoryCluster;    // start cluster of subdirectory or FAT32 root directory
     uint32_t  iEntry;               // entry index in directory cluster or FAT16 root directory
-    uint32_t  nEntries;             // number of entries per cluster or FAT16 root directory size
 
 //	buffered_fat_index=-1;
 
-    iDirectoryCluster = root_directory_cluster;
-    iDirectorySector = root_directory_start;
-    nEntries = fat32 ?  cluster_size << 4 : root_directory_size << 4; // 16 entries per sector
+    iDirectoryCluster = current_directory_cluster;
+    iDirectorySector = current_directory_start;
 
     while (1)
     {
-        for (iEntry = 0; iEntry < nEntries; iEntry++)
+        for (iEntry = 0; iEntry < dir_entries; iEntry++)
         {
             if ((iEntry & 0x0F) == 0) // first entry in sector, load the sector
             {
@@ -380,10 +377,11 @@ int LoadFile(const char *fn, unsigned char *buf)
 
 void ChangeDirectory(DIRENTRY *p)
 {
+	current_directory_cluster=0;
 	if(p)
 	{
-		current_directory_cluster = SwapBB(p->StartCluster);
-		current_directory_cluster |= fat32 ? (SwapBB(p->HighCluster) & 0x0FFF) << 16 : 0;
+		current_directory_cluster = ConvBB_LE(p->StartCluster);
+		current_directory_cluster |= fat32 ? (ConvBB_LE(p->HighCluster) & 0x0FFF) << 16 : 0;
 	}
 	if(current_directory_cluster)
 	{	
@@ -399,64 +397,87 @@ void ChangeDirectory(DIRENTRY *p)
 }
 
 
-DIRENTRY *NextDirEntry(int prev,int (*matchfunc)(const char *fn))
+DIRENTRY *NextDirEntry(int init,int (*matchfunc)(const char *fn))
 {
-    unsigned long  iDirectory = 0;       // only root directory is supported
-    DIRENTRY      *pEntry = NULL;        // pointer to current entry in sector buffer
-    unsigned long  iDirectorySector;     // current sector of directory entries table
-    unsigned long  iEntry;               // entry index in directory cluster or FAT16 root directory
+	static DIRENTRY      *pEntry = NULL;        // pointer to current entry in sector buffer
+	static unsigned long  iDirectorySector;     // current sector of directory entries table
+	static unsigned long  iDirectoryCluster;    // start cluster of subdirectory or FAT32 root directory
+	static unsigned long  iEntry;        // entry index in directory cluster or FAT16 root directory
 	static int prevlfn=0;
 
-	// FIXME traverse clusters if necessary
-
-    iDirectorySector = current_directory_start+(prev>>4);
-
-	if ((prev & 0x0F) == 0) // first entry in sector, load the sector
+	if(init)
 	{
-		sd_read_sector(iDirectorySector, sector_buffer); // root directory is linear
+		iEntry=0;
+		iDirectorySector=current_directory_start;
+		iDirectoryCluster=current_directory_cluster;
+		prevlfn=0;
 	}
-	pEntry = (DIRENTRY*)sector_buffer;
-	pEntry+=(prev&0xf);
 
-	// FIXME - this will stop at a deleted file?
-	if (pEntry->Name[0] != SLOT_EMPTY && pEntry->Name[0] != SLOT_DELETED) // valid entry??
+	while(1)
 	{
-#ifndef DISABLE_LONG_FILENAMES
-		if (pEntry->Attributes == ATTR_LFN)	// Do we have a long filename entry?
+		while (iEntry<dir_entries)
 		{
-			unsigned char *p=&pEntry->Name[0];
-			int seq=p[0];
-			int offset=((seq&0x1f)-1)*13;
-			char *o=&longfilename[offset];
-//			printf("lfn %s, %d, %d\n",pEntry->Name,seq,offset);
-			*o++=p[1];
-			*o++=p[3];
-			*o++=p[5];
-			*o++=p[7];
-			*o++=p[9];
+			if ((iEntry & 0x0F) == 0) // first entry in sector, load the sector
+			{
+				sd_read_sector(iDirectorySector++, sector_buffer);
+				pEntry = (DIRENTRY*)sector_buffer;
+			}
+			else
+				pEntry++;
+			++iEntry;
 
-			*o++=p[0xe];
-			*o++=p[0x10];
-			*o++=p[0x12];
-			*o++=p[0x14];
-			*o++=p[0x16];
-			*o++=p[0x18];
+			#ifndef DISABLE_LONG_FILENAMES
+			if (pEntry->Attributes == ATTR_LFN)	// Do we have a long filename entry?
+			{
+				unsigned char *p=&pEntry->Name[0];
+				int seq=p[0];
+				int offset=((seq&0x1f)-1)*13;
+				char *o=&longfilename[offset];
+				*o++=p[1];
+				*o++=p[3];
+				*o++=p[5];
+				*o++=p[7];
+				*o++=p[9];
 
-			*o++=p[0x1c];
-			*o++=p[0x1e];
-			prevlfn=1;
-		} else
-#endif
-		if ((!(pEntry->Attributes & ATTR_VOLUME)) && ( (pEntry->Attributes & ATTR_DIRECTORY) || (!matchfunc) || matchfunc(&pEntry->Name)))
-		{
-			if(!prevlfn)
-				longfilename[0]=0;
-			prevlfn=0;
-			// FIXME - should check the lfn checksum here.
-//			printf("prevlfn: %d, file %s, %s\n",prevlfn,longfilename,pEntry->Name);
-			return(pEntry);
+				*o++=p[0xe];
+				*o++=p[0x10];
+				*o++=p[0x12];
+				*o++=p[0x14];
+				*o++=p[0x16];
+				*o++=p[0x18];
+
+				*o++=p[0x1c];
+				*o++=p[0x1e];
+				prevlfn=1;
+			}
+			#endif
+			else if ((!(pEntry->Attributes & ATTR_VOLUME)) &&
+				 ( (pEntry->Attributes & ATTR_DIRECTORY) || (!matchfunc) || matchfunc(&pEntry->Name)))
+			{
+				if(!prevlfn)
+					longfilename[0]=0;
+				prevlfn=0;
+				// FIXME - should check the lfn checksum here.
+				return(pEntry);
+			}
+			else
+				prevlfn=0;
 		}
+//		printf("iEntry %d is >= dir_entries %d\n",iEntry,dir_entries);
+
+		if (current_directory_start || fat32) // subdirectory is a linked cluster chain
+		{
+			iDirectoryCluster = GetCluster(iDirectoryCluster); // get next cluster in chain
+			 // check if end of cluster chain
+			if (fat32 ? (iDirectoryCluster & 0x0FFFFFF8) == 0x0FFFFFF8 : (iDirectoryCluster & 0xFFF8) == 0xFFF8)
+				break; // no more clusters in chain
+
+			iDirectorySector = data_start + cluster_size * (iDirectoryCluster - 2); // calculate first sector address of the new cluster
+			iEntry=0;
+		}
+		else
+			break;
 	}
-	return((DIRENTRY *)0);
+    return(0);
 }
 

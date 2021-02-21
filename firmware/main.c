@@ -86,7 +86,7 @@ int matchextension(const char *ext)
 	SPI_ENABLE(HW_SPI_CONF);
 	SPI(SPI_CONF_READ); // Read conf string command
 	
-	printf("Matching %s with romtype %d\n",ext,romtype);
+//	printf("Matching %s with romtype %d\n",ext,romtype);
 
 	if(c=conf_nextfield())
 	{
@@ -128,7 +128,7 @@ int matchextension(const char *ext)
 		c1=conf_next();
 	}
 	SPI_DISABLE(HW_SPI_CONF);
-	printf("Second match result %d\n",done);
+//	printf("Second match result %d\n",i);
 	return(i);
 }
 
@@ -274,12 +274,12 @@ static DIRENTRY *nthfile(int n)
 	int i,j=0;
 	DIRENTRY *p;
 	printf("Looking for file %d\n",n);
-	for(i=0;(j<=n) && (i<dir_entries);++i)
+	for(i=0;j<=n;++i)
 	{
-		printf("d\n");
-		p=NextDirEntry(i,matchextension);
-		if(p)
-			++j;
+		p=NextDirEntry(i==0,matchextension);
+		++j;
+		if(!p)
+			j=n;
 	}
 	return(p);
 }
@@ -333,53 +333,54 @@ static void scrollroms(int row)
 			romindex+=16;
 			break;
 	}
-	listroms(romtype);
+	listroms(row);
 }
 
 
 static void listroms(int row)
 {
+	DIRENTRY *p=(DIRENTRY *)sector_buffer; // Just so it's not NULL
 	int i,j;
-	romtype=row;
-	printf("Setting romtype to %d\n",row);
 	j=0;
 	printf("listrom skipping %d, direntries %d \n",romindex,dir_entries);
-	for(i=0;(j<romindex) && (i<dir_entries);++i)
+	for(i=0;(j<romindex) && p;++i)
 	{
-		DIRENTRY *p=NextDirEntry(i,matchextension);
-		if(p)
-			++j;
+		p=NextDirEntry(i==0,matchextension);
+		++j;
 	}
 
-	for(j=0;(j<7) && (i<dir_entries);++i)
+	for(j=0;(j<7) && p;++i)
 	{
-		DIRENTRY *p=NextDirEntry(i,matchextension);
+		p=NextDirEntry(i==0,matchextension);
 		if(p)
 		{
 			// FIXME declare a global long file name buffer.
 			if(p->Attributes&ATTR_DIRECTORY)
 			{
-				printf("Found directory\n");
 				menu[j].action=MENU_ACTION(&selectdir);
+				menu[j].val=-1;
 				romfilenames[j][0]=FONT_ARROW_RIGHT; // Right arrow
 				romfilenames[j][1]=' ';
 				if(longfilename[0])
-					strncpy(romfilenames[j++]+2,longfilename,28);
+					strncpy(romfilenames[j++]+2,longfilename,27);
 				else
+				{
+					romfilenames[j][13]=0;
 					strncpy(romfilenames[j++]+2,p->Name,11);
+				}
 			}
 			else
 			{
-				printf("Found file\n");
 				menu[j].action=MENU_ACTION(&selectrom);
 				if(longfilename[0])
-					strncpy(romfilenames[j++],longfilename,28);
+					strncpy(romfilenames[j++],longfilename,29);
 				else
+				{
+					romfilenames[j][11]=0;
 					strncpy(romfilenames[j++],p->Name,11);
+				}
 			}
 		}
-		else
-			romfilenames[j][0]=0;
 	}
 	for(;j<7;++j)
 		romfilenames[j][0]=0;
@@ -391,6 +392,11 @@ static void listroms(int row)
 	Menu_Draw(row);
 }
 
+static void fileselect(int row)
+{
+	romtype=row;
+	listroms(row);
+}
 
 
 static void reset(int row)
@@ -472,7 +478,7 @@ int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 	if(c!=';')
 	{
 		strcpy(menu[line].label,"Load *. ");
-		menu[line].action=MENU_ACTION(&listroms);
+		menu[line].action=MENU_ACTION(&fileselect);
 		menu[line].label[8]=c;
 		copytocomma(&menu[line].label[8],LINELENGTH-8,1);
 		++line;
@@ -486,7 +492,7 @@ int parseconf(int selpage,struct menu_entry *menu,int first,int limit)
 				if(!selpage)
 				{
 					strcpy(menu[line].label,"Load");
-					menu[line].action=MENU_ACTION(&listroms);
+					menu[line].action=MENU_ACTION(&fileselect);
 					++line;
 				}
 				c=conf_nextfield();
