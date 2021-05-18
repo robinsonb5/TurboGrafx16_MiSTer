@@ -54,20 +54,6 @@ module sdram (
 	output reg        wram_req_ack,
 	input             wram_we,
 
-	input      [19:0] bsram_addr,
-	input       [7:0] bsram_din,
-	output     [15:0] bsram_dout,
-	input             bsram_req,
-	output reg        bsram_req_ack,
-	input             bsram_we,
-
-	input      [19:1] bsram_io_addr,
-	input      [15:0] bsram_io_din,
-	output reg [15:0] bsram_io_dout,
-	input             bsram_io_req,
-	output reg        bsram_io_req_ack,
-	input             bsram_io_we,
-
 	input             vram0_req,
 	output reg        vram0_ack,
 	input      [15:1] vram0_addr,
@@ -247,18 +233,16 @@ reg  [2:0] oe_latch, next_oe;
 reg  [2:0] we_latch, next_we;
 reg  [1:0] ds[3], next_ds[3];
 
-localparam PORT_NONE  = 3'd0;
+localparam PORT_NONE  = 2'd0;
 
-localparam PORT_ROM   = 3'd1;
-localparam PORT_WRAM  = 3'd2;
-localparam PORT_BSRAM = 3'd3;
-localparam PORT_BSRAM_IO = 3'd4;
+localparam PORT_ROM   = 2'd1;
+localparam PORT_WRAM  = 2'd2;
 
-localparam PORT_VRAM  = 3'd1;
-localparam PORT_ARAM  = 3'd2;
+localparam PORT_VRAM  = 2'd1;
+localparam PORT_ARAM  = 2'd2;
 
-reg  [2:0] port[3];
-reg  [2:0] next_port[3];
+reg  [1:0] port[3];
+reg  [1:0] next_port[3];
 reg [24:0] next_addr[3];
 
 reg [15:0] vram0_dout_reg;
@@ -286,7 +270,6 @@ reg  clkref_rise_d;
 always @(posedge clk) clkref_rise_d <= clkref_rise;
 
 // ROM, RAM: bank 0
-// BSRAM: bank 1
 always @(*) begin
 	next_port[0] = PORT_NONE;
 	next_addr[0] = 0;
@@ -307,18 +290,6 @@ always @(*) begin
 		{ next_oe[0], next_we[0] } = { ~wram_we, wram_we };
 		next_ds[0] = wram_we ? { wram_addr[0], ~wram_addr[0] } : 2'b11;
 		next_din[0] = { wram_din, wram_din };
-	end else if (bsram_req ^ bsram_req_ack) begin
-		next_port[0] = PORT_BSRAM;
-		next_addr[0] = { 5'b01111, bsram_addr };
-		{ next_oe[0], next_we[0] } = { ~bsram_we, bsram_we };
-		next_ds[0] = { bsram_addr[0], ~bsram_addr[0] };
-		next_din[0] = { bsram_din, bsram_din };
-	end else if (bsram_io_req ^ bsram_io_req_ack) begin
-		next_port[0] = PORT_BSRAM_IO;
-		next_addr[0] = { 5'b01111, bsram_io_addr, 1'b0 };
-		{ next_oe[0], next_we[0] } = { ~bsram_io_we, bsram_io_we };
-		next_ds[0] = 2'b11;
-		next_din[0] = bsram_io_din;
 	end
 end
 
@@ -362,11 +333,6 @@ always @(*) begin
 		next_din[2] = vram0_din;
 	end
 end
-
-reg [15:0] bsram_dout_reg;
-//reg [15:0] wram_dout_reg;
-assign bsram_dout = (t == STATE_READ0 && oe_latch[0] && port[0] == PORT_BSRAM) ? sd_din : bsram_dout_reg;
-//assign wram_dout = (t == STATE_READ0 && oe_latch[0] && port[0] == PORT_WRAM) ? sd_din : wram_dout_reg;
 
 always @(posedge clk) begin
 
@@ -475,8 +441,6 @@ always @(posedge clk) begin
 			case (port[0])
 				PORT_ROM:   rom_req_ack <= rom_req;
 				PORT_WRAM:  wram_req_ack <= wram_req;
-				PORT_BSRAM: bsram_req_ack <= bsram_req;
-				PORT_BSRAM_IO: bsram_io_req_ack <= bsram_io_req;
 				default: ;
 			endcase
 		end
@@ -513,14 +477,12 @@ always @(posedge clk) begin
 		end
 
 		// read phase
-		// ROM, WRAM, BSRAM
+		// ROM, WRAM
 		if(t == STATE_DS0 && oe_latch[0]) { SDRAM_DQMH, SDRAM_DQML } <= 2'b00;
 		if(t == STATE_READ0 && oe_latch[0]) begin
 			case (port[0])
 				PORT_ROM:   begin rom_dout <= sd_din; rom_req_ack <= rom_req; end
 				PORT_WRAM:  begin wram_dout <= sd_din; wram_req_ack <= wram_req; end
-				PORT_BSRAM: begin bsram_dout_reg <= sd_din; bsram_req_ack <= bsram_req; end
-				PORT_BSRAM_IO: begin bsram_io_dout <= sd_din; bsram_io_req_ack <= bsram_io_req; end
 				default: ;
 			endcase
 		end

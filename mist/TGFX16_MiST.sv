@@ -62,8 +62,9 @@ assign LED  = ~ioctl_download & ~bk_ena;
 parameter CONF_STR = {
 	"TGFX16;;",
 	"F,BINPCESGX,Load;",
-//	"S,SAV,Mount;",
-//	"TF,Write Save RAM;",
+	"SC,CUE,Mount CD;",
+	"S0,SAV,Mount;",
+	"TF,Write Save RAM;",
 	"P1,Video options;",
 	"P1O12,Scandoubler Fx,None,CRT 25%,CRT 50%,CRT 75%;",
 	"P1O3,Overscan,Hidden,Visible;",
@@ -73,7 +74,7 @@ parameter CONF_STR = {
 	"P2O9,Turbo Tap,Disabled,Enabled;",
 	"P2OA,Controller,2 Buttons,6 Buttons;",
 	"P2OB,Mouse,Disable,Enable;",
-//	"OE,Arcade Card,Disabled,Enabled;",
+	"OE,Arcade Card,Disabled,Enabled;",
 	"T0,Reset;",
 	"V,v1.0.",`BUILD_DATE
 };
@@ -86,8 +87,7 @@ wire       turbotap = status[9];
 wire       buttons6 = status[10];
 wire       mouse_en = status[11];
 wire       bk_save = status[15];
-wire       sgx = ioctl_index[7:6] == 2'b10;
-wire       ac_en = 0;//status[14];
+wire       ac_en = status[14];
 
 ////////////////////   CLOCKS   ///////////////////
 
@@ -105,7 +105,7 @@ pll pll
 
 reg reset;
 always @(posedge clk_sys) begin
-	reset <= buttons[1] | status[0] | ioctl_download;
+	reset <= buttons[1] | status[0] | ioctl_download | bk_reset;
 end
 
 //////////////////   MiST I/O   ///////////////////
@@ -142,8 +142,11 @@ wire  [7:0] sd_buff_dout;
 wire  [7:0] sd_buff_din;
 wire        sd_buff_wr;
 wire        sd_buff_rd;
-wire        img_mounted;
+wire  [1:0] img_mounted;
 wire [31:0] img_size;
+wire        user_io_spi_do;
+
+assign      SPI_DO = !CONF_DATA0 ? user_io_spi_do : !SPI_SS2 ? data_io_spi_do : 1'bZ;
 
 user_io #(.STRLEN($size(CONF_STR)>>3)) user_io
 (
@@ -152,7 +155,7 @@ user_io #(.STRLEN($size(CONF_STR)>>3)) user_io
 	.SPI_SS_IO(CONF_DATA0),
 	.SPI_CLK(SPI_SCK),
 	.SPI_MOSI(SPI_DI),
-	.SPI_MISO(SPI_DO),
+	.SPI_MISO(user_io_spi_do),
 
 	.conf_str(CONF_STR),
 
@@ -187,14 +190,31 @@ user_io #(.STRLEN($size(CONF_STR)>>3)) user_io
 	.img_size(img_size)
 );
 
+wire data_io_spi_di = SPI_SS4 ? SPI_DI : SPI_DO;
+wire data_io_spi_do;
+
 data_io data_io
 (
 	.clk_sys(clk_sys),
 	.SPI_SCK(SPI_SCK),
-	.SPI_DI(SPI_DI),
-	.SPI_DO(SPI_DO),
+	.SPI_DI(data_io_spi_di),
+	.SPI_DO(data_io_spi_do),
 	.SPI_SS2(SPI_SS2),
 	.SPI_SS4(SPI_SS4),
+
+	.cd_stat(cd_stat),
+	.cd_stat_strobe(cd_stat_rec),
+	.cd_command(cd_comm),
+	.cd_command_strobe(cd_comm_send),
+	.cd_data(cd_dataout),
+	.cd_data_strobe(cd_dataout_send),
+	.cd_data_out(cd_dat),
+	.cd_data_out_strobe(cd_wr),
+	.cd_dm(cd_dm),
+	.cd_dat_req(cd_dat_req),
+	.cd_dataout_req(cd_dataout_req),
+	.cd_reset_req(cd_reset_req),
+	.cd_fifo_halffull(cd_fifo_halffull),
 
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
@@ -226,24 +246,10 @@ reg         wram_wrD;
 wire        wram_req;
 wire        wram_req_ack;
 
-wire [19:0] BSRAM_ADDR;
-reg  [19:0] bsram_sd_addr;
-wire        BSRAM_CE_N;
-wire        BSRAM_OE_N;
-wire        BSRAM_WE_N;
-wire        BSRAM_RD_N;
-wire  [7:0] BSRAM_Q = BSRAM_ADDR[0] ? bsram_dout[15:8] : bsram_dout[7:0];
-wire  [7:0] BSRAM_D;
-reg   [7:0] bsram_din;
-wire [15:0] bsram_dout;
-wire        bsram_rd = ~BSRAM_CE_N & ~BSRAM_RD_N;
-reg         bsram_rdD;
-wire        bsram_wr = ~BSRAM_CE_N & ~BSRAM_WE_N;
-reg         bsram_wrD;
-wire        bsram_req;
-reg         bsram_req_reg;
-
-wire        VRAM_OE_N;
+wire [10:0] BRM_A;
+wire [ 7:0] BRM_DI;
+wire [ 7:0] BRM_DO;
+wire        BRM_WE;
 
 wire [16:1] VRAM0_ADDR;
 reg  [15:1] vram0_addr_sd;
@@ -305,15 +311,6 @@ always @(posedge clk_sys) begin
 end
 
 always @(posedge clk_mem) begin
-/*
-		bsram_rdD <= bsram_rd;
-		bsram_wrD <= bsram_wr;
-		if ((bsram_rd && BSRAM_ADDR[19:1] != bsram_sd_addr[19:1]) || (~bsram_wrD & bsram_wr) || (~bsram_rdD & bsram_rd)) begin
-			bsram_req <= ~bsram_req;
-			bsram_sd_addr <= BSRAM_ADDR;
-			bsram_din <= BSRAM_D;
-		end
-*/
 
 	vram0_weD <= VRAM0_WE;
 	if (((~vram0_weD & VRAM0_WE) || (VRAM0_RD && VRAM0_ADDR[15:1] != vram0_addr_sd))) begin
@@ -353,22 +350,6 @@ sdram sdram
 	.wram_req(wram_req),
 	.wram_req_ack(wram_req_ack),
 
-	.bsram_addr(bsram_sd_addr),
-//	.bsram_din(bsram_din),
-	.bsram_din(BSRAM_D),
-	.bsram_dout(bsram_dout),
-	.bsram_req(bsram_req),
-	.bsram_req_ack(),
-//	.bsram_we(~BSRAM_WE_N),
-	.bsram_we(bsram_wrD),
-
-	.bsram_io_addr(BSRAM_IO_ADDR),
-	.bsram_io_din(BSRAM_IO_D),
-	.bsram_io_dout(BSRAM_IO_Q),
-	.bsram_io_req(bsram_io_req),
-	.bsram_io_req_ack(),
-	.bsram_io_we(bk_load),
-
 	.vram0_req(vram0_req),
 	.vram0_ack(),
 	.vram0_addr(vram0_addr_sd),
@@ -385,11 +366,9 @@ sdram sdram
 
 	.aram_addr(aram_addr_sd),
 	.aram_din(aram_din),
-//	.aram_din(ARAM_D),
 	.aram_dout(aram_dout),
-	.aram_req(!sgx & aram_req),
+	.aram_req(/*!sgx &*/ aram_req),
 	.aram_req_ack(),
-//	.aram_we(~ARAM_WE_N)
 	.aram_we(aram_wr_last)
 );
 
@@ -419,22 +398,27 @@ end
 ////////////////////////////  SYSTEM  ///////////////////////////////////
 
 wire cart_download   = ioctl_download & (ioctl_index[5:0] <= 6'h01);
-wire cd_dat_download = ioctl_download & (ioctl_index[5:0] == 6'h02);
 
 reg cd_en = 0;
+reg sgx = 0;
 always @(posedge clk_sys) begin
-        if(img_mounted && img_size) cd_en <= 1;
-        if(cart_download) cd_en <= 0;
+	if(img_mounted[1]) cd_en <= |img_size;
+	if (cart_download) sgx <= ioctl_index[7:6] == 2'b10;
 end
 
-wire [95:0] cd_comm;
-wire        cd_comm_send;
-reg  [15:0] cd_stat;
-reg         cd_stat_rec;
-reg         cd_dataout_req;
-wire [79:0] cd_dataout;
-wire        cd_dataout_send;
-wire        cd_reset_req;
+wire [95:0] cd_comm;         // command to target
+wire        cd_comm_send;    // when the command should be sent
+wire [15:0] cd_stat;         // status word
+wire        cd_stat_rec;     // status word arrived
+wire        cd_dataout_req;  // request data from initiator
+wire [79:0] cd_dataout;      // data to target
+wire        cd_dataout_send; // data to target should be sent
+wire        cd_reset_req;    // reset target request
+wire  [7:0] cd_dat;          // data from target
+wire        cd_wr;           // data from target valid
+wire        cd_dat_req;      // data fifo accepts from target
+wire        cd_dm;           // data is cdda(0), data(1)
+wire        cd_fifo_halffull;// cdda fifo state
 
 wire [21:0] cd_ram_a;
 wire        cd_ram_rd, cd_ram_wr;
@@ -458,7 +442,7 @@ pce_top #(.LITE(LITE), .USE_INTERNAL_RAM(1'b1)) pce_top
 	.ROM_POP(populous[ioctl_addr[9]]),
 	.ROM_CLKEN(ce_rom),
 
-  .EXT_RAM_A(WRAM_ADDR),
+	.EXT_RAM_A(WRAM_ADDR),
 	.EXT_RAM_DI(WRAM_Q),
 	.EXT_RAM_DO(WRAM_D),
 	.EXT_RAM_RD(),
@@ -466,15 +450,15 @@ pce_top #(.LITE(LITE), .USE_INTERNAL_RAM(1'b1)) pce_top
 	.EXT_RAM_WR(WRAM_WR),
 	
 	.ADRAM_A(ARAM_ADDR),
-	.ADRAM_DI(ARAM_Q),
-	.ADRAM_DO(ARAM_D),
+	.ADRAM_DI(ARAM_D),
+	.ADRAM_DO(ARAM_Q),
 	.ADRAM_WE(ARAM_WR),
 	.ADRAM_RD(ARAM_RD),
 
-	.BRM_A(bram_addr),
-	.BRM_DO(bram_q),
-	.BRM_DI(bram_data),
-	.BRM_WE(bram_wr),
+	.BRM_A(BRM_A),
+	.BRM_DO(BRM_DO),
+	.BRM_DI(BRM_DI),
+	.BRM_WE(BRM_WE),
 
 	.VRAM0_A(VRAM0_ADDR),
 	.VRAM0_DO(VRAM0_D),
@@ -501,26 +485,27 @@ pce_top #(.LITE(LITE), .USE_INTERNAL_RAM(1'b1)) pce_top
 
 	.CD_EN(cd_en),
 	.AC_EN(ac_en),
-/*
 
-        .CD_STAT(cd_stat[7:0]),
-        .CD_MSG(cd_stat[15:8]),
-        .CD_STAT_GET(cd_stat_rec),
+	.CD_STAT(cd_stat[7:0]),
+	.CD_MSG(cd_stat[15:8]),
+	.CD_STAT_GET(cd_stat_rec),
 
-        .CD_COMM(cd_comm),
-        .CD_COMM_SEND(cd_comm_send),
+	.CD_COMM(cd_comm),
+	.CD_COMM_SEND(cd_comm_send),
 
-        .CD_DOUT_REQ(cd_dataout_req),
-        .CD_DOUT(cd_dataout),
-        .CD_DOUT_SEND(cd_dataout_send),
+	.CD_DOUT_REQ(cd_dataout_req),
 
-        .CD_RESET(cd_reset_req),
+	.CD_DOUT(cd_dataout),
+	.CD_DOUT_SEND(cd_dataout_send),
 
-        .CD_DATA(!cd_dat_byte ? cd_dat[7:0] : cd_dat[15:8]),
-        .CD_WR(cd_wr),
-        .CD_DATA_END(cd_dat_req),
-        .CD_DM(cd_dm),
-*/
+	.CD_RESET(cd_reset_req),
+
+	.CD_DATA(cd_dat),
+	.CD_WR(cd_wr),
+	.CD_DATA_END(cd_dat_req),
+	.CD_DM(cd_dm),
+	.CD_FIFO_HALFFULL(cd_fifo_halffull),
+
 	.CDDA_SL(cdda_sl),
 	.CDDA_SR(cdda_sr),
 	.ADPCM_S(adpcm_s),
@@ -529,7 +514,7 @@ pce_top #(.LITE(LITE), .USE_INTERNAL_RAM(1'b1)) pce_top
 
 	.BG_EN(1'b1),
 	.SPR_EN(1'b1),
-	.GRID_EN(1'b0),
+	.GRID_EN(2'b00),
 	.CPU_PAUSE_EN(1'b0),
 
 	.ReducedVBL(~overscan),
@@ -675,87 +660,64 @@ wire [1:0] joy_out;
 wire [3:0] joy_in = joy_latch;
 
 //////////////////////////// BACKUP RAM /////////////////////
-reg  [19:1] BSRAM_IO_ADDR;
-wire [15:0] BSRAM_IO_D;
-wire [15:0] BSRAM_IO_Q;
-reg  [15:0] bsram_io_q_save;
-reg         bsram_io_req;
-reg         bk_ena, bk_load;
-reg         bk_state;
-reg  [11:0] sav_size;
+dpram #(.addr_width(11)) bram_inst
+(
+	.clock       (clk_sys),
 
-assign      sd_buff_din = sd_buff_addr[0] ? bsram_io_q_save[15:8] : bsram_io_q_save[7:0];
+	.address_a   (BRM_A),
+	.wren_a      (BRM_WE),
+	.data_a      (BRM_DI),
+	.q_a         (BRM_DO),
+
+	.address_b   ({sd_lba[1:0],sd_buff_addr}),
+	.wren_b      (sd_buff_wr & sd_ack),
+	.data_b      (sd_buff_dout),
+	.q_b         (sd_buff_din)
+);
+
+reg  bk_ena     = 0;
+reg  bk_load    = 0;
+reg  bk_reset   = 0;
 
 always @(posedge clk_sys) begin
+	reg  old_load = 0, old_save = 0, old_ack, old_mounted = 0, old_download = 0;
+	reg  bk_state = 0;
 
-	reg img_mountedD;
-	reg ioctl_downloadD;
-	reg bk_loadD, bk_saveD;
-	reg sd_ackD;
+	bk_reset <= 0;
 
-	if (reset) begin
-		bk_ena <= 0;
-		bk_state <= 0;
-		bk_load <= 0;
+	old_download <= ioctl_download;
+	if (~old_download & ioctl_download) bk_ena <= 0;
+
+	old_mounted <= img_mounted[0];
+	if(~old_mounted && img_mounted[0] && img_size) begin
+		bk_ena <= 1;
+		bk_load <= 1;
+	end
+
+	old_load <= bk_load;
+	old_save <= bk_save;
+	old_ack  <= sd_ack;
+
+	if(~old_ack & sd_ack) {sd_rd, sd_wr} <= 0;
+
+	if(!bk_state) begin
+		if(bk_ena & ((~old_load & bk_load) | (~old_save & bk_save))) begin
+			bk_state <= 1;
+			sd_lba <= 0;
+			sd_rd <=  bk_load;
+			sd_wr <= ~bk_load;
+		end
 	end else begin
-		img_mountedD <= img_mounted;
-		if (~img_mountedD & img_mounted) begin
-			if (|img_size) begin
-				bk_ena <= 1;
-				bk_load <= 1;
-				sav_size <= img_size[20:9];
+		if(old_ack & ~sd_ack) begin
+			if(&sd_lba[1:0]) begin
+				if (bk_load) bk_reset <= 1;
+				bk_load <= 0;
+				bk_state <= 0;
 			end else begin
-				bk_ena <= 0;
+				sd_lba <= sd_lba + 1'd1;
+				sd_rd  <=  bk_load;
+				sd_wr  <= ~bk_load;
 			end
-		end
-
-		ioctl_downloadD <= ioctl_download;
-		if (~ioctl_downloadD & ioctl_download) bk_ena <= 0;
-
-		bk_loadD <= bk_load;
-		bk_saveD <= bk_save;
-		sd_ackD  <= sd_ack;
-
-		if (~sd_ackD & sd_ack) { sd_rd, sd_wr } <= 2'b00;
-
-		case (bk_state)
-		0:	if (bk_ena && ((~bk_loadD & bk_load) || (~bk_saveD & bk_save))) begin
-				bk_state <= 1;
-				sd_lba <= 0;
-				sd_rd <= bk_load;
-				sd_wr <= ~bk_load;
-				if (bk_save) begin
-					BSRAM_IO_ADDR <= 0;
-					bsram_io_req <= ~bsram_io_req;
-				end else
-					BSRAM_IO_ADDR <= 19'h7ffff;
-			end
-		1:	if (sd_ackD & ~sd_ack) begin
-				if (sd_lba[11:0] == sav_size) begin
-					bk_load <= 0;
-					bk_state <= 0;
-				end else begin
-					sd_lba <= sd_lba + 1'd1;
-					sd_rd  <= bk_load;
-					sd_wr  <= ~bk_load;
-				end
-			end
-		endcase
-
-		if (sd_buff_wr) begin
-			if (sd_buff_addr[0]) begin
-				BSRAM_IO_D[15:8] <= sd_buff_dout;
-				bsram_io_req <= ~bsram_io_req;
-				BSRAM_IO_ADDR <= BSRAM_IO_ADDR + 1'd1;
-			end else
-				BSRAM_IO_D[7:0] <= sd_buff_dout;
-		end
-
-		if (~sd_buff_addr[0]) bsram_io_q_save <= BSRAM_IO_Q;
-
-		if (sd_buff_rd & sd_buff_addr[0]) begin
-			bsram_io_req <= ~bsram_io_req;
-			BSRAM_IO_ADDR <= BSRAM_IO_ADDR + 1'd1;
 		end
 	end
 end

@@ -49,6 +49,7 @@ entity cd is
 		CD_DATA		: in std_logic_vector(7 downto 0);
 		CD_WR			: in std_logic;
 		CD_DATA_END	: out std_logic;
+		CD_FIFO_HALFFULL: out std_logic;
 		
 		DM				: in std_logic;
 		
@@ -165,6 +166,7 @@ architecture rtl of cd is
 	signal FIFO_WR_REQ		: std_logic;
 	signal FIFO_D 				: std_logic_vector(31 downto 0);
 	signal FIFO_Q 				: std_logic_vector(31 downto 0);
+	signal FIFO_USEDW       : std_logic_vector(11 downto 0);
 	signal SAMPLE_CE 			: std_logic;
 	signal OUTL 				: signed(15 downto 0);
 	signal OUTR 				: signed(15 downto 0);
@@ -663,14 +665,17 @@ begin
 			end if;
 		end if;
 	end process;
-	
+
+	CD_FIFO_HALFFULL <= FIFO_USEDW(11);
+
 	FIFO : entity work.CDDA_FIFO 
 	port map(
 		clock		=> CLK,
 		data		=> FIFO_D,
 		wrreq		=> FIFO_WR_REQ,
 		full		=> FIFO_FULL,
-		
+		usedw       => FIFO_USEDW,
+
 		rdreq		=> FIFO_RD_REQ,
 		empty		=> FIFO_EMPTY,
 		q			=> FIFO_Q

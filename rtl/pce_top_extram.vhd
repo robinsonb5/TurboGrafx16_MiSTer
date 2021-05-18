@@ -87,6 +87,7 @@ entity pce_top is
 		CD_WR       : in  std_logic;
 		CD_DATA_END : out std_logic;
 		CD_DM       : in  std_logic;
+		CD_FIFO_HALFFULL : out std_logic;
 
 		CDDA_SL     : out signed(15 downto 0);
 		CDDA_SR     : out signed(15 downto 0);
@@ -675,6 +676,7 @@ port map(
 	
 	CD_REGION   => CD_REGION,
 	CD_RESET		=> CD_RESET,
+	CD_FIFO_HALFFULL => CD_FIFO_HALFFULL,
 	
 	DM				=> CD_DM,
 	
