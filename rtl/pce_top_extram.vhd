@@ -59,7 +59,6 @@ entity pce_top is
 		EXT_RAM_CE  : out std_logic;
 		EXT_RAM_RD  : out std_logic;
 		EXT_RAM_WR  : out std_logic;
-		DBG_RAM_OK  : out std_logic;
 		AC_EN       : in  std_logic;
 
 		-- ADPCM DRAM
@@ -145,7 +144,6 @@ signal CPU_ROM_SEL_N	: std_logic;
 signal RAM_DO			: std_logic_vector(7 downto 0);
 signal RAM_A			: std_logic_vector(12 downto 0);
 
-signal PRAM_DO			: std_logic_vector(7 downto 0);
 signal CPU_PRAM_SEL_N: std_logic;
 
 signal EXT_RAM_SEL : std_logic;
@@ -612,19 +610,6 @@ process( CLK ) begin
 	end if;
 end process;
 
---PRAM : entity work.dpram generic map (15,8)
---port map (
---	clock		=> CLK,
---	address_a=> CPU_A(14 downto 0),
---	data_a	=> CPU_DO,
---	wren_a	=> CPU_CE and not CPU_PRAM_SEL_N and not CPU_WR_N,
---	q_a		=> PRAM_DO,
---
---	address_b=> CLR_A,
---	data_b	=> (others => '0'),
---	wren_b	=> CLR_WE
---);
-
 CPU_PRAM_SEL_N <= CPU_A(20) or not CPU_A(19) or not ROM_POP;
 
 RAM : entity work.dpram generic map (13,8)
@@ -639,13 +624,10 @@ port map (
 	data_b	=> (others => '0'),
 	wren_b	=> CLR_WE
 );
---INT_RAM_SEL <= '0';
---DBG_RAM_OK <= '1' when RAM_DO = EXT_RAM_DI else '0';
+
 INT_RAM_SEL <= '1' when USE_INTERNAL_RAM /= 0 and CPU_RAM_SEL_N = '0' and (SGX = '0' or CPU_A(14 downto 13) = "00") else '0';
---INT_RAM_SEL <= '1' when CPU_RAM_SEL_N = '0' else '0';
 --
 RAM_A(12 downto 0)  <= CPU_A(12 downto 0);
---RAM_A(14 downto 13) <= CPU_A(14 downto 13) when SGX = '1' else "00";
 
 -- Backup RAM
 BRM_A <= CPU_A(10 downto 0);

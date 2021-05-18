@@ -65,8 +65,8 @@ sample_in(0)<='0';
 
 -- Pipeline control
 
-process(clk) begin
-	if reset_n='0' then
+process(clk, RESET_N) begin
+	if RESET_N = '0' then
 		LDATA<=(others=>'0');
 		RDATA<=(others=>'0');
 		l_pipe<=(others=>'0');
