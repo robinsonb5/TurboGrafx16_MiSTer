@@ -104,7 +104,7 @@ end
 
 always @(posedge CLK) begin
 	for(int i=0; i<4; i++) begin
-		port[i].addr = port[i].base[20:0] + (port[i].control[1] ? {{5{port[i].control[3]}}, port[i].offset} : 21'd0);
+		if (RAM_CS_N) port[i].addr <= port[i].base[20:0] + (port[i].control[1] ? {{5{port[i].control[3]}}, port[i].offset} : 21'd0);
 	end
 end
 
