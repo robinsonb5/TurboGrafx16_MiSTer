@@ -403,6 +403,7 @@ always @(posedge clk) begin
 			ds[1] <= next_ds[1];
 			if (next_port[1] != PORT_NONE) sd_cmd <= CMD_ACTIVE;
 			if (next_port[1] == PORT_ARAM) aram_req_state <= aram_req;
+			if (next_port[1] == PORT_VRAM && vram1_we) vram1_dout_reg <= vram1_din;
 		end
 
 		// bank3 - VRAM0
@@ -417,6 +418,7 @@ always @(posedge clk) begin
 			{ we_latch[2], oe_latch[2] } <= { next_we[2], next_oe[2] };
 			ds[2] <= next_ds[2];
 
+			if (next_port[2] == PORT_VRAM && vram0_we) vram0_dout_reg <= vram0_din;
 			if (next_port[2] != PORT_NONE) sd_cmd <= CMD_ACTIVE;
 			else
 				if (!we_latch[0] && !oe_latch[0] && !we_latch[1] && !oe_latch[1] && need_refresh) begin
