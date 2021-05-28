@@ -402,7 +402,10 @@ always @(posedge clk) begin
 			{ we_latch[1], oe_latch[1] } <= { next_we[1], next_oe[1] };
 			ds[1] <= next_ds[1];
 			if (next_port[1] != PORT_NONE) sd_cmd <= CMD_ACTIVE;
-			if (next_port[1] == PORT_ARAM) aram_req_state <= aram_req;
+			if (next_port[1] == PORT_ARAM) begin
+				aram_req_state <= aram_req;
+				if (aram_we) if (aram_addr[0]) aram_dout[15:8] <= aram_din; else aram_dout[7:0] <= aram_din;
+			end
 			if (next_port[1] == PORT_VRAM && vram1_we) vram1_dout_reg <= vram1_din;
 		end
 
