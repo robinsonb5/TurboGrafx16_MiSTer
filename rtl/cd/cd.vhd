@@ -112,6 +112,7 @@ architecture rtl of cd is
 	signal ADPCM_RDDATA		: std_logic_vector(7 downto 0);
 	signal ADPCM_WRDATA		: std_logic_vector(7 downto 0);
 	signal ADPCM_WRITE_PEND	: std_logic;
+	signal ADPCM_WRITE_PEND_FULL : std_logic; -- active for a full DRAM slot
 	signal ADPCM_READ_PEND	: std_logic;
 	signal PLAY_READ_PEND	: std_logic;
 	signal DMA_WRITE_PEND	: std_logic;
@@ -214,6 +215,7 @@ begin
 			ADPCM_WRDATA <= (others => '0');
 			ADPCM_RDDATA <= (others => '0');
 			ADPCM_WRITE_PEND <= '0';
+			ADPCM_WRITE_PEND_FULL <= '0';
 			ADPCM_READ_PEND <= '0';
 			PLAY_READ_PEND <= '0';
 			ADPCM_WRITE_NIB <= '0';
@@ -332,6 +334,7 @@ begin
 			end if;
 			
 			if DRAM_CLKEN = '1' then
+				ADPCM_WRITE_PEND_FULL <= ADPCM_WRITE_PEND;
 				case DRAM_SLOT is
 					when SLOT_READ =>
 						if ADPCM_READ_PEND = '1' or PLAY_READ_PEND = '1' then
@@ -366,14 +369,15 @@ begin
 						end if;
 						
 					when SLOT_WRITE =>
-						if ADPCM_WRITE_PEND = '1' or DMA_WRITE_PEND = '1' then
+						if ADPCM_WRITE_PEND_FULL = '1' or DMA_WRITE_PEND = '1' then
 							ADPCM_WRITE_NIB <= not ADPCM_WRITE_NIB;
 							if ADPCM_WRITE_NIB = '1' then
 								if ADPCM_LEN /= x"FFFF" then
 									ADPCM_LEN <= std_logic_vector(unsigned(ADPCM_LEN) + 1);
 								end if;
-								if ADPCM_WRITE_PEND = '1' then
+								if ADPCM_WRITE_PEND_FULL = '1' then
 									ADPCM_WRITE_PEND <= '0';
+									ADPCM_WRITE_PEND_FULL <= '0';
 								end if;
 								if DMA_WRITE_PEND = '1' then
 									DMA_WRITE_PEND <= '0';
@@ -404,7 +408,7 @@ begin
 				ADPCM_CTRL(6 downto 0) <= (others => '0');
 			end if;
 			
-			if DRAM_CLKEN = '1' and DRAM_SLOT = SLOT_WRITE and (ADPCM_WRITE_PEND = '1' or DMA_WRITE_PEND = '1') then
+			if DRAM_CLKEN = '1' and DRAM_SLOT = SLOT_WRITE and (ADPCM_WRITE_PEND_FULL = '1' or DMA_WRITE_PEND = '1') then
 				if ADPCM_CTRL(1) = '1' then
 					ADPCM_WRADDR <= ADPCM_OFFS & "0";
 				else
@@ -599,7 +603,7 @@ begin
 --	);
 	ADRAM_A <= ADPCM_WRADDR when DRAM_SLOT = SLOT_WRITE else ADPCM_RDADDR;
 	ADRAM_DI <= ADPCM_WRDATA(3 downto 0) when ADPCM_WRITE_NIB = '1' else ADPCM_WRDATA(7 downto 4);
-	ADRAM_WE <= '1' when DRAM_SLOT = SLOT_WRITE and (ADPCM_WRITE_PEND = '1' or DMA_WRITE_PEND = '1') else '0';
+	ADRAM_WE <= '1' when DRAM_SLOT = SLOT_WRITE and (ADPCM_WRITE_PEND_FULL = '1' or DMA_WRITE_PEND = '1') else '0';
 	ADRAM_RD <= '1' when DRAM_SLOT = SLOT_READ else '0';
 	ADRAM_CLKEN <= DRAM_CLKEN;
 
