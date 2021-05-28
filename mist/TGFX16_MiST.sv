@@ -279,7 +279,6 @@ wire  [7:0] ARAM_Q = ARAM_ADDR[0] ? aram_dout[15:8] : aram_dout[7:0];
 wire  [7:0] ARAM_D;
 reg   [7:0] aram_din;
 wire [15:0] aram_dout;
-reg         aram_rd_last;
 reg         aram_wr_last;
 wire        aram_req;
 wire        aram_req_reg;
@@ -305,8 +304,7 @@ always @(posedge clk_sys) begin
 	end
 
 	aram_wr_last <= ARAM_WR;
-	aram_rd_last <= ARAM_RD;
-	if (((ARAM_RD | ARAM_WR) & ARAM_ADDR != aram_addr_sd) || (ARAM_RD & ~aram_rd_last) || (ARAM_WR & ~aram_wr_last)) begin
+	if (((ARAM_ADDR != aram_addr_sd) && (ARAM_RD | ARAM_WR)) || (ARAM_WR & ~aram_wr_last)) begin
 		aram_req <= ~aram_req;
 		aram_addr_sd <= ARAM_ADDR;
 		aram_din <= ARAM_D;
@@ -363,7 +361,7 @@ sdram sdram
 	.vram0_dout(VRAM0_Q),
 	.vram0_we(vram0_weD),
 
-	.vram1_req(vram1_req),
+	.vram1_req(sgx & vram1_req),
 	.vram1_ack(),
 	.vram1_addr(vram1_addr_sd),
 	.vram1_din(vram1_din),
