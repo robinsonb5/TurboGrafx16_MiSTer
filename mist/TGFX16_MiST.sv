@@ -237,12 +237,14 @@ wire        rom_req_ack;
 wire [21:0] WRAM_ADDR;
 reg  [21:0] wram_addr_sd;
 wire        WRAM_CE;
+wire        WRAM_RD;
 wire        WRAM_WR;
 wire  [7:0] WRAM_Q = WRAM_ADDR[0] ? wram_dout[15:8] : wram_dout[7:0];
 wire  [7:0] WRAM_D;
 reg   [7:0] wram_din;
 wire [15:0] wram_dout;
 reg         wram_wrD;
+reg         wram_rdD;
 wire        wram_req;
 wire        wram_req_ack;
 
@@ -296,8 +298,9 @@ always @(posedge clk_sys) begin
 		rom_addr_sd <= rom_addr_rw;
 	end
 
-	wram_wrD <= WRAM_WR;
-	if (WRAM_CE && ((WRAM_ADDR != wram_addr_sd) || (~wram_wrD & WRAM_WR))) begin
+	wram_wrD <= WRAM_WR & WRAM_CE;
+	wram_rdD <= WRAM_RD & WRAM_CE;
+	if (WRAM_CE && ((WRAM_ADDR[21:1] != wram_addr_sd[21:1] && WRAM_RD) || (~wram_wrD & WRAM_WR) || (~wram_rdD & WRAM_RD))) begin
 		wram_req <= ~wram_req;
 		wram_addr_sd <= WRAM_ADDR;
 		wram_din <= WRAM_D;
@@ -449,7 +452,7 @@ pce_top #(.LITE(LITE), .USE_INTERNAL_RAM(1'b1)) pce_top
 	.EXT_RAM_A(WRAM_ADDR),
 	.EXT_RAM_DI(WRAM_Q),
 	.EXT_RAM_DO(WRAM_D),
-	.EXT_RAM_RD(),
+	.EXT_RAM_RD(WRAM_RD),
 	.EXT_RAM_CE(WRAM_CE),
 	.EXT_RAM_WR(WRAM_WR),
 	
