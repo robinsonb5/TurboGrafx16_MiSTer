@@ -593,14 +593,6 @@ begin
 		end case;
 	end process;
 	
---	ADPCM_DRAM : entity work.dpram generic map (17,4)
---	port map (
---		clock		=> CLK,
---		address_a=> ADRAM_A,
---		data_a	=> ADRAM_DI,
---		wren_a	=> ADRAM_WE,
---		q_a		=> ADRAM_DO
---	);
 	ADRAM_A <= ADPCM_WRADDR when DRAM_SLOT = SLOT_WRITE else ADPCM_RDADDR;
 	ADRAM_DI <= ADPCM_WRDATA(3 downto 0) when ADPCM_WRITE_NIB = '1' else ADPCM_WRDATA(7 downto 4);
 	ADRAM_WE <= '1' when DRAM_SLOT = SLOT_WRITE and (ADPCM_WRITE_PEND_FULL = '1' or DMA_WRITE_PEND = '1') else '0';

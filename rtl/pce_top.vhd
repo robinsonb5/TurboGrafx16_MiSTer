@@ -198,6 +198,13 @@ signal CPU_PRE_WR	: std_logic;
 signal CD_RAM_CS_N: std_logic;
 signal CD_BRAM_EN	: std_logic;
 
+--ADPCM DRAM
+signal ADRAM_A    : std_logic_vector(16 downto 0);
+signal ADRAM_DI   : std_logic_vector(3 downto 0);
+signal ADRAM_DO   : std_logic_vector(3 downto 0);
+signal ADRAM_WE   : std_logic;
+signal ADRAM_CLKEN: std_logic;
+
 signal BORDER		: std_logic;
 signal GRID			: std_logic_vector(1 downto 0);
 
@@ -261,6 +268,9 @@ generate_NOCHEAT: if (LITE /= 0) generate begin
 end generate;
 
 CPU : entity work.HUC6280
+generic map(
+	VOLTAB_FILE => "../voltab/voltab_small.mif"
+)
 port map(
 	CLK 		=> CLK,
 	RST_N		=> RESET_N,
@@ -648,7 +658,13 @@ port map(
 	
 	SEL_N			=> CD_SEL_N,
 	IRQ_N			=> CD_IRQ_N,
-	
+
+	ADRAM_A     => ADRAM_A,
+	ADRAM_WE    => ADRAM_WE,
+	ADRAM_CLKEN => ADRAM_CLKEN,
+	ADRAM_DI    => ADRAM_DI,
+	ADRAM_DO    => ADRAM_DO,
+
 	CD_STAT		=> CD_STAT,
 	CD_MSG		=> CD_MSG,
 	CD_STAT_GET	=> CD_STAT_GET,
@@ -670,6 +686,15 @@ port map(
 	CD_SL			=> CDDA_SL,
 	CD_SR			=> CDDA_SR,
 	AD_S			=> ADPCM_S
+);
+
+ADPCM_DRAM : entity work.dpram generic map (17,4)
+port map (
+	clock		=> CLK,
+	address_a=> ADRAM_A,
+	data_a	=> ADRAM_DI,
+	wren_a	=> ADRAM_WE and ADRAM_CLKEN,
+	q_a		=> ADRAM_DO
 );
 
 CD_RAM_A  <= '0' & AC_RAM_A when AC_RAM_CS_N = '0' else "1000" & CPU_A(17 downto 0);
