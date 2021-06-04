@@ -45,8 +45,8 @@ set_input_delay -clock clk_spi 0.5 [get_ports { spi_miso }]
 #output delay
 #set_output_delay -clock $clk_sdram -max  1.5 [get_ports sm_clk]
 #set_output_delay -clock $clk_sdram -min -0.8 [get_ports sm_clk]
-set_output_delay -clock clk_sdram -max  1.5 $sdram_outputs
-set_output_delay -clock clk_sdram -min -0.8 $sdram_outputs
+set_output_delay -clock clk_sdram -max -reference_pin [get_ports ram_clk] 1.5 $sdram_outputs
+set_output_delay -clock clk_sdram -min -reference_pin [get_ports ram_clk] -0.8 $sdram_outputs
 
 set_output_delay -clock $clk_med 0.5 [get_ports low_d[*]]
 set_output_delay -clock $clk_med 0.5 [get_ports low_a[*]]

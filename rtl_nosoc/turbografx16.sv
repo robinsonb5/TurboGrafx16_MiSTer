@@ -325,7 +325,7 @@ always @(posedge clk_mem) begin
 
 end
 
-sdram sdram
+sdram_winbond sdram
 (
 	.*,
 	.init_n(locked),
@@ -347,21 +347,21 @@ sdram sdram
 	.wram_req(wram_req),
 	.wram_req_ack(wram_req_ack),
 
-	.bsram_addr(bsram_sd_addr),
-//	.bsram_din(bsram_din),
-	.bsram_din(BSRAM_D),
-	.bsram_dout(bsram_dout),
-	.bsram_req(bsram_req),
-	.bsram_req_ack(),
-//	.bsram_we(~BSRAM_WE_N),
-	.bsram_we(bsram_wrD),
-
-	.bsram_io_addr(BSRAM_IO_ADDR),
-	.bsram_io_din(BSRAM_IO_D),
-	.bsram_io_dout(BSRAM_IO_Q),
-	.bsram_io_req(bsram_io_req),
-	.bsram_io_req_ack(),
-	.bsram_io_we(bk_load),
+//	.bsram_addr(bsram_sd_addr),
+////	.bsram_din(bsram_din),
+//	.bsram_din(BSRAM_D),
+//	.bsram_dout(bsram_dout),
+//	.bsram_req(bsram_req),
+//	.bsram_req_ack(),
+////	.bsram_we(~BSRAM_WE_N),
+//	.bsram_we(bsram_wrD),
+//
+//	.bsram_io_addr(BSRAM_IO_ADDR),
+//	.bsram_io_din(BSRAM_IO_D),
+//	.bsram_io_dout(BSRAM_IO_Q),
+//	.bsram_io_req(bsram_io_req),
+//	.bsram_io_req_ack(),
+//	.bsram_io_we(bk_load),
 
 	.vram0_req(vram0_req),
 	.vram0_ack(),
@@ -456,8 +456,10 @@ always @(posedge clk_sys) begin
 	end
 end
 
-pce_top #(LITE) pce_top
-(
+pce_top #(
+	.LITE(LITE),
+	.USE_INTERNAL_RAM(0)
+) pce_top (
 	.RESET(reset),
 
 	.CLK(clk_sys),

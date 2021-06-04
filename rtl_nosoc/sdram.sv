@@ -54,19 +54,19 @@ module sdram (
 	output reg        wram_req_ack,
 	input             wram_we,
 
-	input      [19:0] bsram_addr,
-	input       [7:0] bsram_din,
-	output     [15:0] bsram_dout,
-	input             bsram_req,
-	output reg        bsram_req_ack,
-	input             bsram_we,
-
-	input      [19:1] bsram_io_addr,
-	input      [15:0] bsram_io_din,
-	output reg [15:0] bsram_io_dout,
-	input             bsram_io_req,
-	output reg        bsram_io_req_ack,
-	input             bsram_io_we,
+//	input      [19:0] bsram_addr,
+//	input       [7:0] bsram_din,
+//	output     [15:0] bsram_dout,
+//	input             bsram_req,
+//	output reg        bsram_req_ack,
+//	input             bsram_we,
+//
+//	input      [19:1] bsram_io_addr,
+//	input      [15:0] bsram_io_din,
+//	output reg [15:0] bsram_io_dout,
+//	input             bsram_io_req,
+//	output reg        bsram_io_req_ack,
+//	input             bsram_io_we,
 
 	input             vram0_req,
 	output reg        vram0_ack,
@@ -299,12 +299,12 @@ always @(*) begin
 	end else if (wram_req ^ wram_req_state) begin
 		next_port[0] = PORT_WRAM;
 		next_addr[0] = { 3'b001, wram_addr };
-	end else if (bsram_req ^ bsram_req_ack) begin
-		next_port[0] = PORT_BSRAM;
-		next_addr[0] = { 5'b01111, bsram_addr };
-	end else if (bsram_io_req ^ bsram_io_req_ack) begin
-		next_port[0] = PORT_BSRAM_IO;
-		next_addr[0] = { 5'b01111, bsram_io_addr, 1'b0 };
+//	end else if (bsram_req ^ bsram_req_ack) begin
+//		next_port[0] = PORT_BSRAM;
+//		next_addr[0] = { 5'b01111, bsram_addr };
+//	end else if (bsram_io_req ^ bsram_io_req_ack) begin
+//		next_port[0] = PORT_BSRAM_IO;
+//		next_addr[0] = { 5'b01111, bsram_io_addr, 1'b0 };
 	end
 end
 
@@ -333,9 +333,9 @@ always @(*) begin
 	end
 end
 
-reg [15:0] bsram_dout_reg;
+//reg [15:0] bsram_dout_reg;
 //reg [15:0] wram_dout_reg;
-assign bsram_dout = (t == STATE_READ0 && oe_latch[0] && port[0] == PORT_BSRAM) ? sd_din : bsram_dout_reg;
+//assign bsram_dout = (t == STATE_READ0 && oe_latch[0] && port[0] == PORT_BSRAM) ? sd_din : bsram_dout_reg;
 //assign wram_dout = (t == STATE_READ0 && oe_latch[0] && port[0] == PORT_WRAM) ? sd_din : wram_dout_reg;
 
 always @(posedge clk) begin
@@ -401,19 +401,19 @@ always @(posedge clk) begin
 				sd_cmd <= CMD_ACTIVE;
 			end
 
-			PORT_BSRAM: begin
-				{ we_latch[0], oe_latch[0] } <= { bsram_we, ~bsram_we };
-				din_latch[0] <= { bsram_din, bsram_din };
-				ds[0] <= {next_addr[0][0], ~next_addr[0][0]};
-				sd_cmd <= CMD_ACTIVE;
-			end
-
-			PORT_BSRAM_IO: begin
-				{ we_latch[0], oe_latch[0] } <= { bsram_io_we, ~bsram_io_we };
-				din_latch[0] <= bsram_io_din;
-				ds[0] <= 2'b11;
-				sd_cmd <= CMD_ACTIVE;
-			end
+//			PORT_BSRAM: begin
+//				{ we_latch[0], oe_latch[0] } <= { bsram_we, ~bsram_we };
+//				din_latch[0] <= { bsram_din, bsram_din };
+//				ds[0] <= {next_addr[0][0], ~next_addr[0][0]};
+//				sd_cmd <= CMD_ACTIVE;
+//			end
+//
+//			PORT_BSRAM_IO: begin
+//				{ we_latch[0], oe_latch[0] } <= { bsram_io_we, ~bsram_io_we };
+//				din_latch[0] <= bsram_io_din;
+//				ds[0] <= 2'b11;
+//				sd_cmd <= CMD_ACTIVE;
+//			end
 
 			default: ;
 
@@ -496,8 +496,8 @@ always @(posedge clk) begin
 			case (port[0])
 				PORT_ROM:   rom_req_ack <= rom_req;
 				PORT_WRAM:  wram_req_ack <= wram_req;
-				PORT_BSRAM: bsram_req_ack <= bsram_req;
-				PORT_BSRAM_IO: bsram_io_req_ack <= bsram_io_req;
+//				PORT_BSRAM: bsram_req_ack <= bsram_req;
+//				PORT_BSRAM_IO: bsram_io_req_ack <= bsram_io_req;
 				default: ;
 			endcase
 		end
@@ -540,8 +540,8 @@ always @(posedge clk) begin
 			case (port[0])
 				PORT_ROM:   begin rom_dout <= sd_din; rom_req_ack <= rom_req; end
 				PORT_WRAM:  begin wram_dout <= sd_din; wram_req_ack <= wram_req; end
-				PORT_BSRAM: begin bsram_dout_reg <= sd_din; bsram_req_ack <= bsram_req; end
-				PORT_BSRAM_IO: begin bsram_io_dout <= sd_din; bsram_io_req_ack <= bsram_io_req; end
+//				PORT_BSRAM: begin bsram_dout_reg <= sd_din; bsram_req_ack <= bsram_req; end
+//				PORT_BSRAM_IO: begin bsram_io_dout <= sd_din; bsram_io_req_ack <= bsram_io_req; end
 				default: ;
 			endcase
 		end
