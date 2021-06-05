@@ -335,7 +335,11 @@ always @(posedge clk_mem) begin
 
 end
 
+`ifdef USE_SDRAM_AMR
+sdram_amr sdram
+`else
 sdram sdram
+`endif
 (
 	.*,
 	.init_n(locked),

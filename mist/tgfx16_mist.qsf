@@ -183,7 +183,7 @@ set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
 
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/spr.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/cpu.stp
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
@@ -300,9 +300,9 @@ set_global_assignment -name PRE_MAPPING_RESYNTHESIS ON
 set_location_assignment PIN_54 -to CLOCK_27
 set_global_assignment -name SDC_FILE tgfx16_mist.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE TGFX16_MiST.sv
-set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name VERILOG_FILE data_io.v
 set_global_assignment -name VERILOG_FILE hybrid_pwm_sd.v
+set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name QIP_FILE "mist-modules/mist_core.qip"
 set_global_assignment -name QIP_FILE pll.qip
 set_global_assignment -name VHDL_FILE ../rtl/pce_top_extram.vhd
@@ -315,6 +315,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/color_mix.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cheatcodes.sv
 set_global_assignment -name VHDL_FILE ../rtl/CEGen.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/arcade.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/sdram_amr.sv
 set_global_assignment -name QIP_FILE ../rtl/HUC6280/HUC6280.qip
 set_global_assignment -name QIP_FILE ../rtl/cd/cd.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/ram.stp
@@ -326,4 +327,6 @@ set_global_assignment -name CDF_FILE output_files/tgfx16_mist.cdf
 set_global_assignment -name SIGNALTAP_FILE output_files/rom.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/vdc.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/spr.stp
+set_global_assignment -name SIGNALTAP_FILE output_files/adpcm.stp
+set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
