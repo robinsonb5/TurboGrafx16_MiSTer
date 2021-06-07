@@ -89,11 +89,11 @@ entity pce_top is
 		CD_DM       : in  std_logic;
 		CD_FIFO_HALFFULL : out std_logic;
 
-		CDDA_SL     : out signed(15 downto 0);
-		CDDA_SR     : out signed(15 downto 0);
+		CDDA_SL     : out signed(PSG_O_WIDTH-1 downto 0);
+		CDDA_SR     : out signed(PSG_O_WIDTH-1 downto 0);
 		ADPCM_S     : out signed(15 downto 0);
-		PSG_SL      : out signed(15 downto 0);
-		PSG_SR      : out signed(15 downto 0);
+		PSG_SL      : out signed(PSG_O_WIDTH-1 downto 0);
+		PSG_SR      : out signed(PSG_O_WIDTH-1 downto 0);
 
 		BG_EN       : in  std_logic;
 		SPR_EN      : in  std_logic;
@@ -637,6 +637,9 @@ BRM_WE <= CPU_CE and not CPU_BRM_SEL_N and not CPU_WR_N;
 
 
 CD : entity work.cd
+generic map(
+	CDDA_O_WIDTH => PSG_O_WIDTH
+)
 port map(
 	CLK 			=> CLK,
 	RST_N			=> RESET_N,
@@ -715,7 +718,8 @@ port map(
 	RAM_A   => AC_RAM_A
 );
 
-PSG_SR <= signed(PCE_SR(PSG_O_WIDTH-1 downto PSG_O_WIDTH-16));
-PSG_SL <= signed(PCE_SL(PSG_O_WIDTH-1 downto PSG_O_WIDTH-16));
+-- AMR - output audio at full width
+PSG_SR <= signed(PCE_SR(PSG_O_WIDTH-1 downto 0));
+PSG_SL <= signed(PCE_SL(PSG_O_WIDTH-1 downto 0));
 
 end rtl;

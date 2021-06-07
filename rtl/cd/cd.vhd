@@ -6,6 +6,9 @@ use IEEE.STD_LOGIC_TEXTIO.all;
 use IEEE.NUMERIC_STD.ALL;
 
 entity cd is
+	generic(
+		CDDA_O_WIDTH : integer := 16
+	);
 	port(
 		RST_N			: in  std_logic;
 		CLK 			: in  std_logic;
@@ -53,8 +56,8 @@ entity cd is
 		
 		DM				: in std_logic;
 		
-		CD_SL			: out signed(15 downto 0);
-		CD_SR			: out signed(15 downto 0);
+		CD_SL			: out signed(CDDA_O_WIDTH-1 downto 0);
+		CD_SR			: out signed(CDDA_O_WIDTH-1 downto 0);
 		AD_S			: out signed(15 downto 0)
 	);
 end cd;
@@ -169,8 +172,8 @@ architecture rtl of cd is
 	signal FIFO_Q 				: std_logic_vector(31 downto 0);
 	signal FIFO_USEDW       : std_logic_vector(11 downto 0);
 	signal SAMPLE_CE 			: std_logic;
-	signal OUTL 				: signed(15 downto 0);
-	signal OUTR 				: signed(15 downto 0);
+	signal OUTL 				: signed(25 downto 0);
+	signal OUTR 				: signed(25 downto 0);
 	
 	--Fader
 	signal FADE_VOL 			: unsigned(10 downto 0);
@@ -246,8 +249,8 @@ begin
 								CD_DTR <= '0';
 							end if;
 						when x"05" =>
-							CDDA_VOL_R <= std_logic_vector(OUTR);
-							CDDA_VOL_L <= std_logic_vector(OUTL);
+							CDDA_VOL_R <= std_logic_vector(OUTR(OUTR'high downto OUTR'high-15));
+							CDDA_VOL_L <= std_logic_vector(OUTL(OUTR'high downto OUTR'high-15));
 							CH_SEL <= not CH_SEL;
 							
 						when x"07" =>
@@ -698,19 +701,21 @@ begin
 			if SAMPLE_CE = '1' and EN = '1' then	-- ~44.1kHz
 				if FIFO_EMPTY = '0' then
 					FIFO_RD_REQ <= '1';
-					OUTL <= resize(shift_right(signed(FIFO_Q(15 downto 0)) * signed(CDDA_FADE_VOL), 10), OUTL'length);
-					OUTR <= resize(shift_right(signed(FIFO_Q(31 downto 16)) * signed(CDDA_FADE_VOL), 10), OUTR'length);
+					OUTL <= resize(signed(FIFO_Q(15 downto 0)) * signed('0'&CDDA_FADE_VOL), OUTL'length);
+					OUTR <= resize(signed(FIFO_Q(31 downto 16)) * signed('0'&CDDA_FADE_VOL), OUTR'length);
 				end if;
 			end if;
 		end if;
 	end process;
 
-			
+
 	--Fader
 	process( RST_N, CLK )
 	begin
 		if RST_N = '0' then
-			FADE_VOL <= "01111111111";
+-- AMR -- Let's not smear a 16-bit value across 26-bits and then throw 10 of them away...
+--			FADE_VOL <= "01111111111";
+			FADE_VOL <= "10000000000";
 			FADE_CNT <= (others => '0');
 		elsif rising_edge(CLK) then
 			if SAMPLE_CE = '1' and EN = '1' then
@@ -722,18 +727,21 @@ begin
 						FADE_VOL <= "0" & (FADE_VOL(9 downto 0) - 1);
 					end if;
 				elsif ADPCM_FADER(2) = '0' then
-					FADE_VOL <= "01111111111";
+					FADE_VOL <= "10000000000";
+--					FADE_VOL <= "01111111111";
 				end if;
 			end if;
 		end if;
 	end process;
 	
-	CDDA_FADE_VOL <= FADE_VOL when ADPCM_FADER(0) = '0' else "01111111111";
-	ADPCM_FADE_VOL <= FADE_VOL when ADPCM_FADER(0) = '1' else "01111111111";
+	CDDA_FADE_VOL <= FADE_VOL when ADPCM_FADER(0) = '0' else "10000000000";
+	ADPCM_FADE_VOL <= FADE_VOL when ADPCM_FADER(0) = '1' else "10000000000";
+--	CDDA_FADE_VOL <= FADE_VOL when ADPCM_FADER(0) = '0' else "01111111111";
+--	ADPCM_FADE_VOL <= FADE_VOL when ADPCM_FADER(0) = '1' else "01111111111";
 	
-	CD_SL <= OUTL;
-	CD_SR <= OUTR;
+	CD_SL <= OUTL(OUTL'high downto OUTL'high-(CDDA_O_WIDTH-1));
+	CD_SR <= OUTR(OUTR'high downto OUTR'high-(CDDA_O_WIDTH-1));
 
-	AD_S <= x"0000" when ADPCM_PLAY = '0' else resize(shift_right(M5205_SOUT * signed(ADPCM_FADE_VOL), 10), AD_S'length);
+	AD_S <= x"0000" when ADPCM_PLAY = '0' else resize(shift_right(M5205_SOUT * signed('0'&ADPCM_FADE_VOL), 10), AD_S'length);
 
 end rtl;
