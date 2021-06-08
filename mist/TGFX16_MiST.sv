@@ -16,6 +16,8 @@
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
 
+`include "defs.v"
+
 module TGFX16_MIST_TOP
 (
    input         CLOCK_27,   // Input clock 27 MHz
