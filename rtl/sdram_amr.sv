@@ -263,17 +263,9 @@ reg [22:1] bankaddr[4];
 reg [1:0] bankdqm[4];
 
 
-// Bank 0 priority encoder - ROM / WRAM
+// Bank 0 priority encoder - WRAM / ARAM
 always @(posedge clk) begin
-	if (rom_req ^ port_state[PORT_ROM]) begin
-		bankreq[0]=1'b1;
-		bankstate[0]=rom_req;
-		bankport[0]=PORT_ROM;
-		bankaddr[0]={1'b0,rom_addr[21:1]};
-		bankdqm[0]={!rom_we,!rom_we};
-		bankwr[0]=rom_we;
-		bankwrdata[0]=rom_din;
-	end else if (wram_req ^ port_state[PORT_WRAM]) begin
+	if (wram_req ^ port_state[PORT_WRAM]) begin
 		bankreq[0]=1'b1;
 		bankstate[0]=wram_req;
 		bankport[0]=PORT_WRAM;
@@ -281,6 +273,14 @@ always @(posedge clk) begin
 		bankaddr[0]={1'b1,wram_addr[21:1]};
 		bankwr[0]=wram_we;
 		bankwrdata[0]={wram_din,wram_din};
+	end else if (aram_req ^ port_state[PORT_ARAM]) begin
+		bankreq[0]= 1'b1;
+		bankstate[0]=aram_req;
+		bankport[0]=PORT_ARAM;
+		bankdqm[0]=aram_we ? { ~aram_addr[0], aram_addr[0] } : 2'b11;
+		bankaddr[0]={6'b000001,aram_addr[16:1]};
+		bankwr[0]=aram_we;
+		bankwrdata[0]={aram_din,aram_din};
 	end else begin
 		bankreq[0]=1'b0;
 		// Just to avoid creating latches
@@ -294,16 +294,15 @@ always @(posedge clk) begin
 	end
 end
 
-
-// ARAM has Bank 1 to itself
+// ROM has Bank 1 to itself
 always @(posedge clk) begin
-	bankreq[1]= aram_req ^ port_state[PORT_ARAM];
-	bankstate[1]=aram_req;
-	bankport[1]=PORT_ARAM;
-	bankdqm[1]=aram_we ? { ~aram_addr[0], aram_addr[0] } : 2'b11;
-	bankaddr[1]={6'b000001,aram_addr[16:1]};
-	bankwr[1]=aram_we;
-	bankwrdata[1]={aram_din,aram_din};
+	bankreq[1]=rom_req ^ port_state[PORT_ROM];
+	bankstate[1]=rom_req;
+	bankport[1]=PORT_ROM;
+	bankaddr[1]={1'b0,rom_addr[21:1]};
+	bankdqm[1]={!rom_we,!rom_we};
+	bankwr[1]=rom_we;
+	bankwrdata[1]=rom_din;
 end
 
 // VRAM0 occupies Bank 2

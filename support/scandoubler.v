@@ -136,9 +136,9 @@ assign b_o = b_mul[11:6];
 
 // Output multiplexing
 
-assign r_out = bypass ? r_in : r_o;
-assign g_out = bypass ? g_in : g_o;
-assign b_out = bypass ? b_in : b_o;
+assign r_out = bypass ? r : r_o;
+assign g_out = bypass ? g : g_o;
+assign b_out = bypass ? b : b_o;
 assign hs_out = bypass ? hs_in : hs_o;
 assign vs_out = bypass ? vs_in : vs_o;
 
