@@ -61,9 +61,13 @@ assign LED  = ~ioctl_download & ~bk_ena;
 parameter CONF_STR = {
 	"TGFX16;;",
 	"F,BINPCESGX,Load;",
+`ifdef USE_CD
 	"SC,CUE,Mount CD;",
+`endif
+`ifdef USE_SAVERAM
 	"S0,SAV,Mount;",
 	"TF,Write Save RAM;",
+`endif
 	"P1,Video options;",
 	"P1O12,Scandoubler Fx,None,CRT 25%,CRT 50%,CRT 75%;",
 	"P1O3,Overscan,Hidden,Visible;",
@@ -71,7 +75,9 @@ parameter CONF_STR = {
 	"P2,Controllers;",
 	"P2O8,Swap Joysticks,No,Yes;",
 	"P2O9,Turbo Tap,Disabled,Enabled;",
+`ifdef USE_6BUTTONS
 	"P2OA,Controller,2 Buttons,6 Buttons;",
+`endif
 	"P2OB,Mouse,Disable,Enable;",
 	"OE,Arcade Card,Disabled,Enabled;",
 	"T0,Reset;",
@@ -556,7 +562,7 @@ mist_video #(.SD_HCNT_WIDTH(10), .COLOR_DEPTH(3)) mist_video
 	.clk_sys(clk_sys),
 	.scanlines(scanlines),
 	.scandoubler_disable(scandoubler_disable),
-	.ypbpr(ypbpr & ypbpr_ena),
+	.ypbpr(ypbpr),
 	.no_csync(no_csync),
 	.rotate(2'b00),
 	.ce_divider(ce_div),
@@ -565,9 +571,9 @@ mist_video #(.SD_HCNT_WIDTH(10), .COLOR_DEPTH(3)) mist_video
 	.SPI_SS3(SPI_SS3),
 	.HSync(~hs),
 	.VSync(~vs),
-	.R(r),
-	.G(g),
-	.B(b),
+	.R(hbl ? 3'd0 : r),
+	.G(hbl ? 3'd0 : g),
+	.B(hbl ? 3'd0 : b),
 	.VGA_HS(VGA_HS),
 	.VGA_VS(VGA_VS),
 	.VGA_R(VGA_R),

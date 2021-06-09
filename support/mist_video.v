@@ -143,9 +143,9 @@ cofi #(.VIDEO_DEPTH(6)) cofi (
 // Finally convert to YPbPr, bypassed is ypbpr is low
 
 wire [7:0] r_final, g_final, b_final;
-wire hs_final,vs_final;
+wire hs_final,vs_final,cs_final;
 
-rgbtoypbpr rgb2ypbpr
+RGBtoYPbPr rgb2ypbpr
 (
 	.clk      ( clk_sys ),
 	.ena      ( ypbpr   ),

@@ -2,6 +2,6 @@ set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) mist_vi
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../mist/mist-modules/osd.v]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) cofi.sv]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) scandoubler.v]
-set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) rgbtoypbpr.vhd]
-set_global_assignment -name VHDL_FILE    [file join $::quartus(qip_path) ../mist/mist-modules/mist.vhd]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) rgbtoypbpr.v]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) ../mist/mist-modules/mist.vhd]
 
