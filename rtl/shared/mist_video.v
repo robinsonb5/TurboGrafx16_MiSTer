@@ -42,11 +42,11 @@ module mist_video
 	input        VSync,
 
 	// MiST video output signals
-	output [5:0] VGA_R,
-	output [5:0] VGA_G,
-	output [5:0] VGA_B,
-	output       VGA_VS,
-	output       VGA_HS
+	output reg [5:0] VGA_R,
+	output reg [5:0] VGA_G,
+	output reg [5:0] VGA_B,
+	output reg      VGA_VS,
+	output reg      VGA_HS
 );
 
 parameter OSD_COLOR    = 3'd4;
@@ -142,16 +142,16 @@ cofi #(.VIDEO_DEPTH(6)) cofi (
 
 // Finally convert to YPbPr, bypassed is ypbpr is low
 
-wire [7:0] r_final, g_final, b_final;
+wire [5:0] r_final, g_final, b_final;
 wire hs_final,vs_final,cs_final;
 
 RGBtoYPbPr rgb2ypbpr
 (
 	.clk      ( clk_sys ),
 	.ena      ( ypbpr   ),
-	.red_in   ( {cofi_r,cofi_r[5:4]} ),
-	.green_in ( {cofi_g,cofi_g[5:4]} ),
-	.blue_in  ( {cofi_b,cofi_b[5:4]} ),
+	.red_in   ( cofi_r ),
+	.green_in ( cofi_g ),
+	.blue_in  ( cofi_b ),
 	.hs_in    ( cofi_hs ),
 	.vs_in    ( cofi_vs ),
 	.cs_in    ( SYNC_AND ? (cofi_hs & cofi_vs) : ~(cofi_hs ^ cofi_vs) ),
@@ -163,13 +163,17 @@ RGBtoYPbPr rgb2ypbpr
 	.cs_out   ( cs_final)
 );
 
-assign VGA_R = r_final[7:2];
-assign VGA_G = g_final[7:2];
-assign VGA_B = b_final[7:2];
+// Register final video signal to avoid hold violations
+always @(posedge clk_sys)
+begin
+	VGA_R <= r_final[5:0];
+	VGA_G <= g_final[5:0];
+	VGA_B <= b_final[5:0];
 
 // a minimig vga->scart cable expects a composite sync signal on the VGA_HS output.
 // and VCC on VGA_VS (to switch into rgb mode)
-assign VGA_HS = ((~no_csync & scandoubler_disable) || ypbpr)? cs_final : hs_final;
-assign VGA_VS = ((~no_csync & scandoubler_disable) || ypbpr)? 1'b1 : vs_final;
+	VGA_HS <= ((~no_csync & scandoubler_disable) || ypbpr)? cs_final : hs_final;
+	VGA_VS <= ((~no_csync & scandoubler_disable) || ypbpr)? 1'b1 : vs_final;
+end
 
 endmodule
