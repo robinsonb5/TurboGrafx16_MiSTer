@@ -120,7 +120,7 @@ architecture RTL of de10lite_top is
 	signal uart_rxd : std_logic;
 	signal uart_txd : std_logic;
 
-COMPONENT TGFX16_Guest
+COMPONENT TGFX16_Shared_Top
 	PORT
 	(
 		CLOCK_27 :	IN STD_LOGIC;
@@ -213,7 +213,7 @@ joyd<=(others=>'1');
 --assign DRAM clock
 --asign DRAM clock enable
 
-guest: COMPONENT TGFX16_Guest
+guest: COMPONENT TGFX16_Shared_Top
 PORT map
 	(
 		CLOCK_27 => MAX10_CLK1_50,

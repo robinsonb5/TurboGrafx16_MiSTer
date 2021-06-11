@@ -183,7 +183,7 @@ architecture rtl of chameleon64_top is
 
 	-- Declare guest component, since it's written in systemverilog
 	
-	COMPONENT TGFX16_Guest
+	COMPONENT TGFX16_Shared_Top
 		PORT
 		(
 			CLOCK_27 :	IN STD_LOGIC;
@@ -429,7 +429,7 @@ begin
 	
 	midi_txd<='1';
 
-	guest: COMPONENT TGFX16_Guest
+	guest: COMPONENT TGFX16_Shared_Top
 	PORT map
 	(
 			CLOCK_27 => clk8,

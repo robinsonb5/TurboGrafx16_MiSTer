@@ -22,11 +22,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 //
 
-module sdram_amr (
+// The following macros must be defined externally to describe the SDRAM chip:
+// SDRAM_ROWBITS <13 in most cases>
+// SDRAM_COLBITS <9 for 32 meg chips, 10 for 64 meg chips.>
+// SDRAM_CL <2 or 3>
+// SDRAM_tCKminCL2 <shortest cycle time allowed for CL2>
+// SDRAM_tRC <Ref/Act to Ref/Act in ps>
+// SDRAM_tWR <write recovery time in cycles>
+// SDRAM_tRP <precharge time in ps>
+//
+// SDRAM_tCK <cycle time in ps> must be supplied as a parameter
+// (Because it's project-specific, not board-specific.)
+// If the core has a variable clock, specify the fastest rate.
 
+module sdram_amr #(parameter SDRAM_tCK) (
 	// interface to the MT48LC16M16 chip
 	inout  [15:0] SDRAM_DQ,   // 16 bit bidirectional data bus
-	output reg [12:0] SDRAM_A,    // 13 bit multiplexed address bus
+	output reg [`SDRAM_ROWBITS-1:0] SDRAM_A,    // 13 bit multiplexed address bus
 	output reg        SDRAM_DQML, // two byte masks
 	output reg        SDRAM_DQMH, // two byte masks
 	output reg [1:0]  SDRAM_BA,   // two banks
@@ -77,12 +89,26 @@ module sdram_amr (
 	input             aram_we
 );
 
+localparam BANK_DELAY = ((`SDRAM_tRC+(SDRAM_tCK-1))/SDRAM_tCK)-2; // tRC-2 in cycles (rounded up)
+localparam BANK_WRITE_DELAY = ((`SDRAM_tRP+(SDRAM_tCK-1))/SDRAM_tCK)+`SDRAM_tWR; // tWR + tRP in cycles (rounded up)
+localparam REFRESH_DELAY = ((`SDRAM_tRC+(SDRAM_tCK-1))/SDRAM_tCK)-1; // tRC-1 in cycles (rounded up)
+
+`ifdef VERILATOR
+initial begin
+	if(SDRAM_tCK>=`SDRAM_tCKminCL2)
+		$display("CL2 is allowed (max speed is %d)",1000000/`SDRAM_tCKminCL2);
+	else if(`SDRAM_CL==2) begin
+		$display("CL2 not allowed at %d MHz (max speed is %d)",1000000/SDRAM_tCK,1000000/`SDRAM_tCKminCL2);
+		$stop;
+	end
+end
+`endif
 
 // RAM configuration
 
 localparam BURST_LENGTH   = 3'b000; // 000=1, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
-localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
+localparam CAS_LATENCY = 3'd`SDRAM_CL; // 2/3 allowed
 localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
 localparam NO_WRITE_BURST = 1'b1;   // 0= write burst enabled, 1=only single access write
 
@@ -134,10 +160,6 @@ localparam CMD_BURST_TERMINATE = 4'b0110;
 localparam CMD_PRECHARGE       = 4'b0010;
 localparam CMD_AUTO_REFRESH    = 4'b0001;
 localparam CMD_LOAD_MODE       = 4'b0000;
-
-localparam BANK_DELAY = 5'd7;	// tRC-2 in cycles (rounded up)
-localparam BANK_WRITE_DELAY = 5'd4; // tWR + tRP in cycles (rounded up)
-localparam REFRESH_DELAY = 5'd7; // tRC-2 in cycles (rounded up)
 
 reg  [3:0] sd_cmd;   // current command sent to sd ram
 reg  [1:0] sd_dqm;
@@ -294,6 +316,7 @@ always @(posedge clk) begin
 	end
 end
 
+
 // ROM has Bank 1 to itself
 always @(posedge clk) begin
 	bankreq[1]=rom_req ^ port_state[PORT_ROM];
@@ -370,7 +393,7 @@ reg cas1_act;
 reg [3:0] cas2_port;
 
 reg [1:0] cas_ba;
-reg [12:0] cas_addr;
+reg [`SDRAM_ROWBITS-1:0] cas_addr;
 reg cas_wr;
 reg [15:0] cas_wrdata;
 reg [1:0] cas_dqm;
@@ -391,9 +414,12 @@ reg [3:0] latch2_port;
 integer loopvar;
 
 reg [15:0] dq_reg;
-
-//reg drive_dq;
-//assign SDRAM_DQ = drive_dq ? dq_reg : 16'bzzzzzzzzzzzzzzzz;
+reg drive_dq;
+`ifdef VERILATOR
+assign SDRAM_DQ = drive_dq ? dq_reg : 16'bzzzzzzzzzzzzzzzz;
+`else
+assign SDRAM_DQ = dq_reg;
+`endif
 
 reg init = 1'b1;
 reg [4:0] reset;
@@ -426,8 +452,11 @@ always @(posedge clk,negedge init_n) begin
 			if(!bankready[loopvar])
 				bankbusy[loopvar]<=bankbusy[loopvar]-4'b1;
 		end
-		
-		SDRAM_DQ<=16'bZZZZZZZZZZZZZZZZ;
+
+`ifndef VERILATOR
+		dq_reg<=16'bZZZZZZZZZZZZZZZZ;
+//		SDRAM_DQ<=16'bZZZZZZZZZZZZZZZZ;
+`endif
 
 		SDRAM_A <= cas_addr; // Autoprecharge
 		
@@ -456,7 +485,7 @@ always @(posedge clk,negedge init_n) begin
 					SDRAM_BA <= 2'b00;
 				end
 				reset<=reset-1'b1;
-				bankbusy[0]<=BANK_DELAY;
+				bankbusy[0]<=BANK_DELAY[4:0];
 				if(reset==0)
 				begin
 					init<=1'b0;
@@ -467,7 +496,7 @@ always @(posedge clk,negedge init_n) begin
 
 			// Request dispatching
 
-//			drive_dq<=1'b0;
+			drive_dq<=1'b0;
 			sd_cmd<=CMD_INHIBIT;
 			sd_dqm<=2'b11;
 			// RAS stage
@@ -488,18 +517,18 @@ always @(posedge clk,negedge init_n) begin
 				if(!(&bankreq) && need_refresh && (&bankready) & !blockrefresh) begin
 					sd_cmd<=CMD_AUTO_REFRESH;
 					refresh_cnt<=0;
-					bankbusy[0]<=REFRESH_DELAY;
-					bankbusy[1]<=REFRESH_DELAY;
-					bankbusy[2]<=REFRESH_DELAY;
-					bankbusy[3]<=REFRESH_DELAY;
+					bankbusy[0]<=REFRESH_DELAY[4:0];
+					bankbusy[1]<=REFRESH_DELAY[4:0];
+					bankbusy[2]<=REFRESH_DELAY[4:0];
+					bankbusy[3]<=REFRESH_DELAY[4:0];
 				end else if(!reservewrite) begin
 					// VRAM ports have priority
 					if(bankreq[2] && bankready[2] && (!writepending || bankwr[2]) && !(writeblocked && bankwr[2])) begin
 						readcycles[1]<=~bankwr[2];
 						port_state[bankport[2]]<=bankstate[2];
-						bankbusy[2]<=BANK_DELAY;
+						bankbusy[2]<=BANK_DELAY[4:0];
 						ras_ba<=2'b10;
-						ras_casaddr<=bankaddr[2][9:1];
+						ras_casaddr<=bankaddr[2][`SDRAM_COLBITS:1];
 						ras_wr<=bankwr[2];
 						ras_wrdata<=bankwrdata[2];
 						ras_dqm<=bankdqm[2];
@@ -507,14 +536,14 @@ always @(posedge clk,negedge init_n) begin
 						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
-						SDRAM_A <= bankaddr[2][22:10];
+						SDRAM_A <= bankaddr[2][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b10;
 					end else if(bankreq[3] && bankready[3] && (!writepending || bankwr[3]) && !(writeblocked && bankwr[3])) begin
 						readcycles[1]<=~bankwr[3];
 						port_state[bankport[3]]<=bankstate[3];
-						bankbusy[3]<=BANK_DELAY;
+						bankbusy[3]<=BANK_DELAY[4:0];
 						ras_ba<=2'b11;
-						ras_casaddr<=bankaddr[3][9:1];
+						ras_casaddr<=bankaddr[3][`SDRAM_COLBITS:1];
 						ras_wr<=bankwr[3];
 						ras_wrdata<=bankwrdata[3];
 						ras_dqm<=bankdqm[3];
@@ -522,14 +551,14 @@ always @(posedge clk,negedge init_n) begin
 						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
-						SDRAM_A <= bankaddr[3][22:10];
+						SDRAM_A <= bankaddr[3][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b11;
 					end else if(bankreq[0] && bankready[0] && (!writepending || bankwr[0]) && !(writeblocked && bankwr[0])) begin
 						readcycles[1]<=~bankwr[0];
 						port_state[bankport[0]]<=bankstate[0];
-						bankbusy[0]<=BANK_DELAY;
+						bankbusy[0]<=BANK_DELAY[4:0];
 						ras_ba<=2'b00;
-						ras_casaddr<=bankaddr[0][9:1];
+						ras_casaddr<=bankaddr[0][`SDRAM_COLBITS:1];
 						ras_wr<=bankwr[0];
 						ras_wrdata<=bankwrdata[0];
 						ras_dqm<=bankdqm[0];
@@ -537,14 +566,14 @@ always @(posedge clk,negedge init_n) begin
 						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
-						SDRAM_A <= bankaddr[0][22:10];
+						SDRAM_A <= bankaddr[0][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b00;
 					end else if(bankreq[1] && bankready[1] && (!writepending || bankwr[1]) && !(writeblocked && bankwr[1])) begin
 						readcycles[1]<=~bankwr[1];
 						port_state[bankport[1]]<=bankstate[1];
-						bankbusy[1]<=BANK_DELAY;
+						bankbusy[1]<=BANK_DELAY[4:0];
 						ras_ba<=2'b01;
-						ras_casaddr<=bankaddr[1][9:1];
+						ras_casaddr<=bankaddr[1][`SDRAM_COLBITS:1];
 						ras_wr<=bankwr[1];
 						ras_wrdata<=bankwrdata[1];
 						ras_dqm<=bankdqm[1];
@@ -552,14 +581,16 @@ always @(posedge clk,negedge init_n) begin
 						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
-						SDRAM_A <= bankaddr[1][22:10];
+						SDRAM_A <= bankaddr[1][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b01;
 					end
 				end
 			end
 
 			if(ras2_port != PORT_NONE) begin 
-				cas_addr<={4'b0010,ras_casaddr};
+				cas_addr<={`SDRAM_ROWBITS{1'b0}};
+				cas_addr[10]<=1'b1; // Auto-precharge
+				cas_addr[`SDRAM_COLBITS-1:0]<=ras_casaddr;
 				cas_wr<=ras_wr;
 				cas_dqm<=ras_dqm;
 				cas_wrdata<=ras_wrdata;
@@ -576,10 +607,12 @@ always @(posedge clk,negedge init_n) begin
 //				SDRAM_A <= {4'b0010,cas_addr}; // Autoprecharge
 				if(cas_wr) begin
 					sd_cmd<=CMD_WRITE;
-					bankbusy[cas_ba]<=BANK_WRITE_DELAY;
-//					drive_dq<=1'b1;
-//					dq_reg <= cas_wrdata;
-					SDRAM_DQ<=cas_wrdata;
+					bankbusy[cas_ba]<=BANK_WRITE_DELAY[4:0];
+`ifdef VERILATOR
+					drive_dq<=1'b1;
+`endif
+//					SDRAM_DQ<=cas_wrdata;
+					dq_reg <= cas_wrdata;
 					sd_dqm<=cas_dqm;
 				end else begin
 					sd_cmd<=CMD_READ;
@@ -593,12 +626,20 @@ always @(posedge clk,negedge init_n) begin
 				sd_dqm<=2'b00;
 
 			// Pump the pipeline.  Write cycles finish here, read cycles continue.
-			mask1_port<=cas2_port;
-			mask2_port<=mask_wr ? PORT_NONE : mask1_port;
-			mask_wr<=cas_wr;
-			mask_wrdata<=cas_wrdata;
-			mask_dqm<=cas_dqm;
 
+			if(`SDRAM_CL==2) begin
+				mask2_port<=mask_wr ? PORT_NONE : cas2_port;
+				mask_wr<=cas_wr;
+				mask_wrdata<=cas_wrdata;
+				mask_dqm<=cas_dqm;
+			end else begin
+				mask1_port<=cas2_port;
+				mask_wr<=cas_wr;
+				mask_wrdata<=cas_wrdata;
+				mask_dqm<=cas_dqm;
+
+				mask2_port<=mask_wr ? PORT_NONE : mask1_port;
+			end
 			// Latch stage
 
 			latch1_port<=mask2_port;
@@ -663,12 +704,18 @@ always @(posedge clk, negedge init_n) begin
 		end
 
 		// Early ack for READs (writes acked anyway, so no need to bother filtering them out.)
-		case (ras2_port)
-			PORT_VRAM0: vram0_ack <= vram0_req;
-			PORT_VRAM1: vram1_ack <= vram1_req;
-			default: ;
-		endcase
-
+		if(`SDRAM_CL==2) begin			case (ras1_port)
+				PORT_VRAM0: vram0_ack <= vram0_req;
+				PORT_VRAM1: vram1_ack <= vram1_req;
+				default: ;
+			endcase
+		end else begin
+			case (ras2_port)
+				PORT_VRAM0: vram0_ack <= vram0_req;
+				PORT_VRAM1: vram1_ack <= vram1_req;
+				default: ;
+			endcase
+		end
 		latch2_port<=latch1_port;
 
 		case (latch2_port)

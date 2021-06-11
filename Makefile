@@ -4,6 +4,8 @@ PROJECT=tgfx16
 PROJECTPATH=./
 PROJECTTOROOT=../
 BOARD=
+ROMSIZE1=16384
+ROMSIZE2=2048
 
 all: $(DEMISTIFYPATH)/site.mk firmware init compile tns mist
 
@@ -14,7 +16,7 @@ $(DEMISTIFYPATH)/site.mk:
 	$(info )
 	$(info Then Copy the example DeMiSTify/site.template file to)
 	$(info DeMiSTify/site.mk and edit the paths for the version(s))
-	$(info  of Quartus you have installed.)
+	$(info of Quartus you have installed.)
 	$(info *******************************************************)
 	$(error site.mk not found.)
 
@@ -26,19 +28,14 @@ $(SUBMODULES):
 
 .PHONY: firmware
 firmware: $(SUBMODULES)
-	make -C firmware -f ../$(DEMISTIFYPATH)/Scripts/firmware.mk DEMISTIFYPATH=../$(DEMISTIFYPATH)
+	make -C firmware -f ../$(DEMISTIFYPATH)/Scripts/firmware.mk DEMISTIFYPATH=../$(DEMISTIFYPATH) ROMSIZE1=$(ROMSIZE1) ROMSIZE2=$(ROMSIZE2)
 
 .PHONY: init
 init:
 	make -f $(DEMISTIFYPATH)/Makefile DEMISTIFYPATH=$(DEMISTIFYPATH) PROJECTTOROOT=$(PROJECTTOROOT) PROJECTPATH=$(PROJECTPATH) PROJECTS=$(PROJECT) BOARD=$(BOARD) init 
 
-.PHONY: buildid
-buildid:
-	cd toplevels; \
-	$(Q13)/quartus_sh -t ../mist/build_id_verilog.tcl
-
 .PHONY: compile
-compile: buildid
+compile: 
 	make -f $(DEMISTIFYPATH)/Makefile DEMISTIFYPATH=$(DEMISTIFYPATH) PROJECTTOROOT=$(PROJECTTOROOT) PROJECTPATH=$(PROJECTPATH) PROJECTS=$(PROJECT) BOARD=$(BOARD) compile
 
 .PHONY: clean

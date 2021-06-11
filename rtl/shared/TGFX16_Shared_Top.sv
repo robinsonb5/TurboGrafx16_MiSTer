@@ -16,9 +16,7 @@
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
 
-`include "defs.v"
-
-module TGFX16_MIST_TOP
+module TGFX16_Shared_Top
 (
    input         CLOCK_27,   // Input clock 27 MHz
 
@@ -64,9 +62,13 @@ assign LED  = ~ioctl_download & ~bk_ena;
 parameter CONF_STR = {
 	"TGFX16;;",
 	"F,BINPCESGX,Load;",
+`ifdef USE_CD
 	"SC,CUE,Mount CD;",
+`endif
+`ifdef USE_SAVERAM
 	"S0,SAV,Mount;",
 	"TF,Write Save RAM;",
+`endif
 	"P1,Video options;",
 	"P1O12,Scandoubler Fx,None,CRT 25%,CRT 50%,CRT 75%;",
 	"P1O3,Overscan,Hidden,Visible;",
@@ -74,7 +76,9 @@ parameter CONF_STR = {
 	"P2,Controllers;",
 	"P2O8,Swap Joysticks,No,Yes;",
 	"P2O9,Turbo Tap,Disabled,Enabled;",
+`ifdef USE_6BUTTONS
 	"P2OA,Controller,2 Buttons,6 Buttons;",
+`endif
 	"P2OB,Mouse,Disable,Enable;",
 	"OE,Arcade Card,Disabled,Enabled;",
 	"T0,Reset;",
@@ -337,8 +341,8 @@ always @(posedge clk_mem) begin
 
 end
 
-`ifdef USE_SDRAM_AMR
-sdram_amr sdram
+`ifdef SDRAM_WINBOND
+sdram_amr #(.SDRAM_tCK(7813)) sdram // 128Mhz clock speed, tCK is ~7813ps
 `else
 sdram sdram
 `endif
@@ -439,8 +443,9 @@ wire  [7:0] cd_ram_do;
 
 wire        ce_rom;
 
-wire signed [19:0] cdda_sl, cdda_sr, psg_sl, psg_sr;
+wire signed [19:0] cdda_sl, cdda_sr;
 wire signed [15:0] adpcm_s;
+wire signed [19:0] psg_sl, psg_sr;
 
 pce_top #(.LITE(LITE), .PSG_O_WIDTH(20), .USE_INTERNAL_RAM(1'b1)) pce_top
 (
@@ -554,7 +559,10 @@ wire bw;
 wire ce_vid;
 wire [1:0] dcc;
 
-mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
+wire [2:0] ce_div = dcc == 2'b00 ? 3'd7 :
+		dcc == 2'b01 ? 3'd5 : 3'd3;
+
+mist_video #(.SD_HCNT_WIDTH(10), .COLOR_DEPTH(3)) mist_video
 (
 	.clk_sys(clk_sys),
 	.scanlines(scanlines),
@@ -562,7 +570,7 @@ mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
 	.ypbpr(ypbpr),
 	.no_csync(no_csync),
 	.rotate(2'b00),
-	.ce_divider(1'b1),
+	.ce_divider(ce_div),
 	.SPI_DI(SPI_DI),
 	.SPI_SCK(SPI_SCK),
 	.SPI_SS3(SPI_SS3),
@@ -614,7 +622,6 @@ hybrid_pwm_sd_2ndorder #(.signalwidth(19)) dac
 	.d_r({~audior_sign, audior_clamp}),
 	.q_r(AUDIO_R)
 );
-
 
 ////////////////////////////  INPUT  ///////////////////////////////////
 wire [31:0] joy_0 = joy_swap ? joy_b : joy_a;
