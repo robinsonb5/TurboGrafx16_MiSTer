@@ -281,7 +281,7 @@ reg [3:0] bankstate;
 reg [3:0] bankwr;
 reg [15:0] bankwrdata[4];
 reg [3:0] bankport[4];
-reg [22:1] bankaddr[4];
+reg [23:1] bankaddr[4];
 reg [1:0] bankdqm[4];
 
 
@@ -292,7 +292,7 @@ always @(posedge clk) begin
 		bankstate[0]=wram_req;
 		bankport[0]=PORT_WRAM;
 		bankdqm[0]=wram_we ? { ~wram_addr[0], wram_addr[0] } : 2'b11;
-		bankaddr[0]={1'b1,wram_addr[21:1]};
+		bankaddr[0]={2'b01,wram_addr[21:1]};
 		bankwr[0]=wram_we;
 		bankwrdata[0]={wram_din,wram_din};
 	end else if (aram_req ^ port_state[PORT_ARAM]) begin
@@ -300,7 +300,7 @@ always @(posedge clk) begin
 		bankstate[0]=aram_req;
 		bankport[0]=PORT_ARAM;
 		bankdqm[0]=aram_we ? { ~aram_addr[0], aram_addr[0] } : 2'b11;
-		bankaddr[0]={6'b000001,aram_addr[16:1]};
+		bankaddr[0]={7'b0000001,aram_addr[16:1]};
 		bankwr[0]=aram_we;
 		bankwrdata[0]={aram_din,aram_din};
 	end else begin
@@ -309,7 +309,7 @@ always @(posedge clk) begin
 		bankwr[0]=1'b0;
 		bankstate[0]=wram_req;
 		bankdqm[0]=wram_we ? { ~wram_addr[0], wram_addr[0] } : 2'b11;
-		bankaddr[0]={1'b1, wram_addr[21:1]};
+		bankaddr[0]={2'b01, wram_addr[21:1]};
 		bankwr[0]=wram_we;
 		bankwrdata[0]={wram_din,wram_din};
 		bankport[0]=PORT_NONE;
@@ -322,7 +322,7 @@ always @(posedge clk) begin
 	bankreq[1]=rom_req ^ port_state[PORT_ROM];
 	bankstate[1]=rom_req;
 	bankport[1]=PORT_ROM;
-	bankaddr[1]={1'b0,rom_addr[21:1]};
+	bankaddr[1]={2'b00,rom_addr[21:1]};
 	bankdqm[1]={!rom_we,!rom_we};
 	bankwr[1]=rom_we;
 	bankwrdata[1]=rom_din;
@@ -333,7 +333,7 @@ always @(posedge clk) begin
 	bankreq[2]=vram0_req ^ port_state[PORT_VRAM0];
 	bankstate[2]=vram0_req;
 	bankport[2]=PORT_VRAM0;
-	bankaddr[2]={7'b0000000,vram0_addr};
+	bankaddr[2]={8'b00000000,vram0_addr};
 	bankwr[2]=vram0_we;
 	bankwrdata[2]=vram0_din;
 	bankdqm[2]={!vram0_we,!vram0_we};
@@ -344,7 +344,7 @@ always @(posedge clk) begin
 	bankreq[3]=vram1_req ^ port_state[PORT_VRAM1];
 	bankstate[3]=vram1_req;
 	bankport[3]=PORT_VRAM1;
-	bankaddr[3]={7'b0000000,vram1_addr};
+	bankaddr[3]={8'b00000000,vram1_addr};
 	bankwr[3]=vram1_we;
 	bankwrdata[3]=vram1_din;
 	bankdqm[3]={!vram1_we,!vram1_we};
