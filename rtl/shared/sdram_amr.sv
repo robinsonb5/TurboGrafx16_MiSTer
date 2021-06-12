@@ -119,7 +119,6 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 
 // 64ms/8192 rows = 7.8us -> 842 cycles@108MHz
 localparam RFRSH_CYCLES = 11'd842;
-reg        refresh = 1'b0;
 reg [10:0] refresh_cnt = 11'b0;
 reg need_refresh;
 always @(posedge clk)
@@ -377,7 +376,7 @@ reg port_state[10];
 // Command variables required for CAS
 
 reg [1:0] ras_ba;
-reg [8:0] ras_casaddr;
+reg [`SDRAM_COLBITS-1:0] ras_casaddr;
 reg ras_wr;
 reg [15:0] ras_wrdata;
 reg [1:0] ras_dqm;
@@ -403,8 +402,6 @@ reg [1:0] cas_dqm;
 reg [3:0] mask1_port;
 reg [3:0] mask2_port;
 reg mask_wr;
-reg [15:0] mask_wrdata;
-reg [1:0] mask_dqm;
 
 // Latch stage
 
@@ -414,8 +411,8 @@ reg [3:0] latch2_port;
 integer loopvar;
 
 reg [15:0] dq_reg;
-reg drive_dq;
 `ifdef VERILATOR
+reg drive_dq;
 assign SDRAM_DQ = drive_dq ? dq_reg : 16'bzzzzzzzzzzzzzzzz;
 `else
 assign SDRAM_DQ = dq_reg;
@@ -496,7 +493,9 @@ always @(posedge clk,negedge init_n) begin
 
 			// Request dispatching
 
+`ifdef VERILATOR
 			drive_dq<=1'b0;
+`endif
 			sd_cmd<=CMD_INHIBIT;
 			sd_dqm<=2'b11;
 			// RAS stage
@@ -630,13 +629,9 @@ always @(posedge clk,negedge init_n) begin
 			if(`SDRAM_CL==2) begin
 				mask2_port<=mask_wr ? PORT_NONE : cas2_port;
 				mask_wr<=cas_wr;
-				mask_wrdata<=cas_wrdata;
-				mask_dqm<=cas_dqm;
 			end else begin
 				mask1_port<=cas2_port;
 				mask_wr<=cas_wr;
-				mask_wrdata<=cas_wrdata;
-				mask_dqm<=cas_dqm;
 
 				mask2_port<=mask_wr ? PORT_NONE : mask1_port;
 			end
