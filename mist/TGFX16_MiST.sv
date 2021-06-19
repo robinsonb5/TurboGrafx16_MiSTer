@@ -300,7 +300,7 @@ always @(posedge clk_sys) begin
 
 	wram_wrD <= WRAM_WR & WRAM_CE;
 	wram_rdD <= WRAM_RD & WRAM_CE;
-	if (WRAM_CE && ((WRAM_ADDR[21:1] != wram_addr_sd[21:1] && WRAM_RD) || (~wram_wrD & WRAM_WR) || (~wram_rdD & WRAM_RD))) begin
+	if ((WRAM_CE && WRAM_ADDR[21:1] != wram_addr_sd[21:1]) || ((WRAM_ADDR[0] != wram_addr_sd[0] | ~wram_wrD) & WRAM_WR) || (~wram_rdD & WRAM_RD)) begin
 		wram_req <= ~wram_req;
 		wram_addr_sd <= WRAM_ADDR;
 		wram_din <= WRAM_D;
