@@ -95,19 +95,23 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 localparam RFRSH_CYCLES = 11'd842;
 reg        refresh = 1'b0;
 reg [10:0] refresh_cnt = 11'b0;
-wire       need_refresh = (refresh_cnt >= RFRSH_CYCLES);
+reg need_refresh;
+always @(posedge clk)
+	need_refresh <= (refresh_cnt >= RFRSH_CYCLES);
 
 // We don't synchronise to the host core except with regard to refresh cycles,
 // which must be timed so as not to delay a VRAM access.
 // We supply a four-cycle window beginning shortly after clkref drops, during
 // which refresh may begin.
 
+reg clkref_d3;
 reg clkref_d2;
 reg clkref_d;
 reg [2:0] refreshwindow;
 
 always@(posedge clk) begin
-	clkref_d2<=clkref;
+	clkref_d3<=clkref;
+	clkref_d2<=clkref_d3;
 	clkref_d<=clkref_d2;
 	if(clkref_d && !clkref_d2)
 			refreshwindow<=3'b000;
@@ -260,7 +264,7 @@ reg [1:0] bankdqm[4];
 
 
 // Bank 0 priority encoder - ROM / WRAM
-always @(*) begin
+always @(posedge clk) begin
 	if (rom_req ^ port_state[PORT_ROM]) begin
 		bankreq[0]=1'b1;
 		bankstate[0]=rom_req;
@@ -292,7 +296,7 @@ end
 
 
 // ARAM has Bank 1 to itself
-always @(*) begin
+always @(posedge clk) begin
 	bankreq[1]= aram_req ^ port_state[PORT_ARAM];
 	bankstate[1]=aram_req;
 	bankport[1]=PORT_ARAM;
@@ -303,7 +307,7 @@ always @(*) begin
 end
 
 // VRAM0 occupies Bank 2
-always @(*) begin
+always @(posedge clk) begin
 	bankreq[2]=vram0_req ^ port_state[PORT_VRAM0];
 	bankstate[2]=vram0_req;
 	bankport[2]=PORT_VRAM0;
@@ -314,7 +318,7 @@ always @(*) begin
 end
 
 // VRAM1 occupies Bank 3
-always @(*) begin
+always @(posedge clk) begin
 	bankreq[3]=vram1_req ^ port_state[PORT_VRAM1];
 	bankstate[3]=vram1_req;
 	bankport[3]=PORT_VRAM1;
@@ -334,7 +338,12 @@ reg [1:0] readcycles;
 // If VRAM wants to write we reserve a slot;
 // other ports have to wait for the bus to be idle.
 
-wire writepending = (bankreq[2] & bankwr[2]) | (bankreq[3] & bankwr[3]);
+reg writepending;
+always @(posedge clk) begin
+	writepending <= (vram0_we & (vram0_req ^ port_state[PORT_VRAM0]))
+			| (vram1_we & (vram1_req ^ port_state[PORT_VRAM1]));
+end
+
 wire writeblocked = |readcycles;
 wire reservewrite = writepending & writeblocked;
 
@@ -351,15 +360,18 @@ reg ras_wr;
 reg [15:0] ras_wrdata;
 reg [1:0] ras_dqm;
 reg [3:0] ras1_port;
+reg ras1_act;
 reg [3:0] ras2_port;
+reg ras2_act;
 
 // Cas stage
 
 reg [3:0] cas1_port;
+reg cas1_act;
 reg [3:0] cas2_port;
 
 reg [1:0] cas_ba;
-reg [8:0] cas_addr;
+reg [12:0] cas_addr;
 reg cas_wr;
 reg [15:0] cas_wrdata;
 reg [1:0] cas_dqm;
@@ -417,24 +429,31 @@ always @(posedge clk,negedge init_n) begin
 		end
 		
 		SDRAM_DQ<=16'bZZZZZZZZZZZZZZZZ;
+
+		SDRAM_A <= cas_addr; // Autoprecharge
 		
 		if(init) begin
 			// initialization takes place at the end of the reset phase
 			sd_cmd<=CMD_INHIBIT;
 			if(bankready[0]) begin
 
+				if(reset == 16) begin
+					cas_addr[10]<=1'b1;	// Precharge all banks - set in advance to reduce address mux
+				end
+
 				if(reset == 15) begin
 					sd_cmd <= CMD_PRECHARGE;
-					SDRAM_A[10] <= 1'b1;      // precharge all banks
+//					SDRAM_A[10] <= 1'b1;      // precharge all banks
 				end
 
 				if(reset == 10 || reset == 8) begin
 					sd_cmd <= CMD_AUTO_REFRESH;
+					cas_addr <= MODE;	// Put the mode on the address bus in advance of the command.
 				end
 
 				if(reset == 2) begin
 					sd_cmd <= CMD_LOAD_MODE;
-					SDRAM_A <= MODE;
+//					SDRAM_A <= MODE;
 					SDRAM_BA <= 2'b00;
 				end
 				reset<=reset-1'b1;
@@ -454,9 +473,11 @@ always @(posedge clk,negedge init_n) begin
 			sd_dqm<=2'b11;
 			// RAS stage
 			ras1_port<=PORT_NONE;
+			ras1_act<=1'b0;
 			ras2_port<=ras1_port;
+			ras2_act<=ras1_act;
 
-			if(ras1_port == PORT_NONE && cas1_port==PORT_NONE) begin // Pick a bank and dispatch the command
+			if(!ras1_act && !cas1_act) begin // Pick a bank and dispatch the command
 				readcycles<={1'b0,readcycles[1]};
 				ras_wr<=1'b0;
 				ras_dqm<=2'b11;
@@ -484,6 +505,7 @@ always @(posedge clk,negedge init_n) begin
 						ras_wrdata<=bankwrdata[2];
 						ras_dqm<=bankdqm[2];
 						ras1_port<=bankport[2];
+						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
 						SDRAM_A <= bankaddr[2][22:10];
@@ -498,6 +520,7 @@ always @(posedge clk,negedge init_n) begin
 						ras_wrdata<=bankwrdata[3];
 						ras_dqm<=bankdqm[3];
 						ras1_port<=bankport[3];
+						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
 						SDRAM_A <= bankaddr[3][22:10];
@@ -512,6 +535,7 @@ always @(posedge clk,negedge init_n) begin
 						ras_wrdata<=bankwrdata[0];
 						ras_dqm<=bankdqm[0];
 						ras1_port<=bankport[0];
+						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
 						SDRAM_A <= bankaddr[0][22:10];
@@ -526,6 +550,7 @@ always @(posedge clk,negedge init_n) begin
 						ras_wrdata<=bankwrdata[1];
 						ras_dqm<=bankdqm[1];
 						ras1_port<=bankport[1];
+						ras1_act<=1'b1;
 
 						sd_cmd<=CMD_ACTIVE;
 						SDRAM_A <= bankaddr[1][22:10];
@@ -535,20 +560,21 @@ always @(posedge clk,negedge init_n) begin
 			end
 
 			if(ras2_port != PORT_NONE) begin 
-				cas_addr<=ras_casaddr;
+				cas_addr<={4'b0010,ras_casaddr};
 				cas_wr<=ras_wr;
 				cas_dqm<=ras_dqm;
 				cas_wrdata<=ras_wrdata;
 				cas_ba<=ras_ba;
 			end
 			cas1_port<=ras2_port;
+			cas1_act<=ras2_act;
 
 		// CAS stage
 
 			if(cas1_port != PORT_NONE) begin 
 				// Action the CAS command, if any
 				SDRAM_BA <= cas_ba;
-				SDRAM_A <= {4'b0010,cas_addr}; // Autoprecharge
+//				SDRAM_A <= {4'b0010,cas_addr}; // Autoprecharge
 				if(cas_wr) begin
 					sd_cmd<=CMD_WRITE;
 					bankbusy[cas_ba]<=BANK_WRITE_DELAY;

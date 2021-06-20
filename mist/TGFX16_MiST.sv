@@ -16,6 +16,8 @@
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
 
+`include "defs.v"
+
 module TGFX16_MIST_TOP
 (
    input         CLOCK_27,   // Input clock 27 MHz
@@ -437,9 +439,10 @@ wire  [7:0] cd_ram_do;
 
 wire        ce_rom;
 
-wire signed [15:0] cdda_sl, cdda_sr, adpcm_s, psg_sl, psg_sr;
+wire signed [19:0] cdda_sl, cdda_sr, psg_sl, psg_sr;
+wire signed [15:0] adpcm_s;
 
-pce_top #(.LITE(LITE), .USE_INTERNAL_RAM(1'b1)) pce_top
+pce_top #(.LITE(LITE), .PSG_O_WIDTH(20), .USE_INTERNAL_RAM(1'b1)) pce_top
 (
 	.RESET(reset),
 
@@ -575,25 +578,43 @@ mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(3)) mist_video
 	.VGA_B(VGA_B)
 );
 
+
 //////////////////   AUDIO   //////////////////
-wire signed [16:0] audioL = psg_sl + cdda_sl + adpcm_s;
-wire signed [16:0] audioR = psg_sr + cdda_sr + adpcm_s;
 
-hybrid_pwm_sd dacl
+wire [21:0] psg_sl_ext = {psg_sl[19],psg_sl[19],psg_sl} /* synthesis noprune */;
+wire [21:0] psg_sr_ext = {psg_sr[19],psg_sr[19],psg_sr} /* synthesis noprune */;
+
+wire [21:0] cdda_sl_ext = {cdda_sl[19],cdda_sl[19],cdda_sl} /* synthesis noprune */;
+wire [21:0] cdda_sr_ext = {cdda_sr[19],cdda_sr[19],cdda_sr} /* synthesis noprune */;
+
+wire [21:0] adpcm_s_ext = {adpcm_s[15],adpcm_s[15],adpcm_s,4'b0} /* synthesis noprune */;
+
+// Sum three audio sources
+reg [21:0] audioL;
+reg [21:0] audioR;
+
+always @(posedge clk_sys) begin
+	audioL <= psg_sl_ext + cdda_sl_ext + adpcm_s_ext;
+	audioR <= psg_sr_ext + cdda_sr_ext + adpcm_s_ext;
+end
+
+// Clamp audio 
+wire audiol_sign=audioL[21];
+wire [17:0] audiol_clamp = (audioL[21:18] == 4'b1111 || audioL[21:18]==4'b0000) ? audioL[17:0] : {18{~audiol_sign}};
+
+wire audior_sign=audioR[21];
+wire [17:0] audior_clamp = (audioR[21:18] == 4'b1111 || audioR[21:18]==4'b0000) ? audioR[17:0] : {18{~audior_sign}};
+
+hybrid_pwm_sd_2ndorder #(.signalwidth(19)) dac
 (
 	.clk(clk_sys),
-	.n_reset(~reset),
-	.din({~audioL[16], audioL[15:1]}),
-	.dout(AUDIO_L)
+	.reset_n(1'b1),
+	.d_l({~audiol_sign, audiol_clamp}),
+	.q_l(AUDIO_L),
+	.d_r({~audior_sign, audior_clamp}),
+	.q_r(AUDIO_R)
 );
 
-hybrid_pwm_sd dacr
-(
-	.clk(clk_sys),
-	.n_reset(~reset),
-	.din({~audioR[16], audioR[15:1]}),
-	.dout(AUDIO_R)
-);
 
 ////////////////////////////  INPUT  ///////////////////////////////////
 wire [31:0] joy_0 = joy_swap ? joy_b : joy_a;

@@ -71,6 +71,7 @@ entity HUC6270 is
 end HUC6270;
 
 architecture rtl of HUC6270 is
+	attribute altera_attribute : string;
 
 	--registers
 	type reg_t is array (0 to 31) of std_logic_vector(15 downto 0);
@@ -204,8 +205,10 @@ architecture rtl of HUC6270 is
 	signal BG_SR3 			: std_logic_vector(15 downto 0);
 	type ShiftRegColor_t is array (0 to 1) of std_logic_vector(3 downto 0);
 	signal BG_SRC 			: ShiftRegColor_t;
+	attribute altera_attribute of BG_SRC : signal is "-name AUTO_SHIFT_REGISTER_RECOGNITION OFF";
 	type BGColorArray_t is array (0 to 7) of std_logic_vector(7 downto 0);
 	signal BG_COLOR 		: BGColorArray_t;
+	attribute altera_attribute of BG_COLOR : signal is "-name AUTO_SHIFT_REGISTER_RECOGNITION OFF";
 	signal BG_RAM_ADDR	: std_logic_vector(15 downto 0);
 	
 	signal SPR_FETCH		: std_logic;
@@ -281,6 +284,7 @@ architecture rtl of HUC6270 is
 	signal SPR_LINE_CLR 	: std_logic;
 	type SPColorArray_t is array (0 to 7) of std_logic_vector(8 downto 0);
 	signal SPR_COLOR		: SPColorArray_t; 
+	attribute altera_attribute of SPR_COLOR : signal is "-name AUTO_SHIFT_REGISTER_RECOGNITION OFF";
 
 	signal SAT_ADDR		: std_logic_vector(7 downto 0);
 	signal SAT_Q			: std_logic_vector(15 downto 0);
