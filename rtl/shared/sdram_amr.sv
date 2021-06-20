@@ -217,12 +217,9 @@ assign SDRAM_DQML = sd_dqm[0];
 
 
 // Data can be transferred on alternate cycles, until all four banks have been serviced.
-// Read cycles in a single bank can be serviced every 8 cycles.
+// Read cycles in a single bank can be serviced every 8 cycles (CL2) or 10 cycles (CL3).
 
 // Write cycles look like this:
-// We use 2-word bursts, we invert the low address bit and mask off the first word, so the actual 
-// write occurs one cycle after the Write command.  This gives a cycle's headroom to ensure
-// there's no bus contention.
 
 // |     RAS     |     CAS     |     MASK    |    LATCH    |     RAS     |     CAS     | ....
 // | Act  | .... | .... | Writ | .... | .... | .... | .... | Act  | .... | .... | Writ | .... 
@@ -455,7 +452,7 @@ always @(posedge clk,negedge init_n) begin
 //		SDRAM_DQ<=16'bZZZZZZZZZZZZZZZZ;
 `endif
 
-		SDRAM_A <= cas_addr; // Autoprecharge
+		SDRAM_A <= cas_addr;
 		
 		if(init) begin
 			// initialization takes place at the end of the reset phase
