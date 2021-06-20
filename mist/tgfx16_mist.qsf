@@ -17,7 +17,7 @@
 # file is updated automatically by the Quartus II software
 # and any changes you make may be lost or overwritten.
 
-set_global_assignment -name TOP_LEVEL_ENTITY TGFX16_MIST_TOP
+set_global_assignment -name TOP_LEVEL_ENTITY TGFX16_Shared_Top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 5.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "22:49:11  JANUARY 31, 2006"
 set_global_assignment -name LAST_QUARTUS_VERSION 13.1
@@ -56,7 +56,7 @@ set_global_assignment -name FLEX10K_DEVICE_IO_STANDARD LVTTL/LVCMOS
 set_global_assignment -name ON_CHIP_BITSTREAM_DECOMPRESSION ON
 set_global_assignment -name GENERATE_RBF_FILE ON
 
-set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:build_id_verilog.tcl"
+set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:../rtl/shared/build_id_verilog.tcl"
 set_global_assignment -name SMART_RECOMPILE ON
 set_global_assignment -name ENABLE_DRC_SETTINGS OFF
 set_global_assignment -name ENABLE_CLOCK_LATENCY ON
@@ -182,8 +182,8 @@ set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS ON
 set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
 
 
-set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE ../support/stp2.stp
+set_global_assignment -name ENABLE_SIGNALTAP ON
+set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
@@ -197,6 +197,28 @@ set_global_assignment -name PHYSICAL_SYNTHESIS_MAP_LOGIC_TO_MEMORY_FOR_AREA ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_RETIMING ON
 set_location_assignment PLL_1 -to pll|altpll_component|auto_generated|pll1
+set_global_assignment -name OPTIMIZE_POWER_DURING_FITTING OFF
+set_global_assignment -name ADV_NETLIST_OPT_SYNTH_WYSIWYG_REMAP OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
+set_global_assignment -name SEED 1
+set_global_assignment -name OPTIMIZE_POWER_DURING_SYNTHESIS "NORMAL COMPILATION"
+set_global_assignment -name PRE_MAPPING_RESYNTHESIS ON
+set_location_assignment PIN_54 -to CLOCK_27
+set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
+
+set_global_assignment -name VERILOG_MACRO "SDRAM_ROWBITS=13"
+set_global_assignment -name VERILOG_MACRO "SDRAM_COLBITS=9"
+set_global_assignment -name VERILOG_MACRO "SDRAM_CL=3"
+set_global_assignment -name VERILOG_MACRO "SDRAM_tCKminCL2=10000"
+set_global_assignment -name VERILOG_MACRO "SDRAM_tRC=66000"
+set_global_assignment -name VERILOG_MACRO "SDRAM_tWR=2"
+set_global_assignment -name VERILOG_MACRO "SDRAM_tRP=15000"
+set_global_assignment -name VERILOG_MACRO "USE_CD=1"
+set_global_assignment -name VERILOG_MACRO "USE_SAVERAM=1"
+set_global_assignment -name VERILOG_MACRO "USE_6BUTTONS=1"
+
+
+
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_COLOR 2147039 -section_id Top
@@ -291,33 +313,9 @@ set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[15]
 set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to SPI_SCK
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to LED
-set_global_assignment -name OPTIMIZE_POWER_DURING_FITTING OFF
-set_global_assignment -name ADV_NETLIST_OPT_SYNTH_WYSIWYG_REMAP OFF
-set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
-set_global_assignment -name SEED 1
-set_global_assignment -name OPTIMIZE_POWER_DURING_SYNTHESIS "NORMAL COMPILATION"
-set_global_assignment -name PRE_MAPPING_RESYNTHESIS ON
-set_location_assignment PIN_54 -to CLOCK_27
-set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
-set_global_assignment -name SYSTEMVERILOG_FILE TGFX16_MiST.sv
-set_global_assignment -name VERILOG_FILE data_io.v
-set_global_assignment -name VERILOG_FILE hybrid_pwm_sd.v
-set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
-set_global_assignment -name QIP_FILE "mist-modules/mist_core.qip"
+set_global_assignment -name SDC_FILE mist.sdc
+set_global_assignment -name QIP_FILE ../rtl/shared/tgfx16.qip
 set_global_assignment -name QIP_FILE pll.qip
-set_global_assignment -name VHDL_FILE ../rtl/pce_top_extram.vhd
-set_global_assignment -name VHDL_FILE ../rtl/dpram.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/mb128.sv
-set_global_assignment -name VHDL_FILE ../rtl/huc6270.vhd
-set_global_assignment -name VHDL_FILE ../rtl/huc6260.vhd
-set_global_assignment -name VHDL_FILE ../rtl/huc6202.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/color_mix.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/cheatcodes.sv
-set_global_assignment -name VHDL_FILE ../rtl/CEGen.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/arcade.sv
-set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/sdram_amr.sv
-set_global_assignment -name QIP_FILE ../rtl/HUC6280/HUC6280.qip
-set_global_assignment -name QIP_FILE ../rtl/cd/cd.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/ram.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/dio.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/cpu.stp
@@ -328,8 +326,71 @@ set_global_assignment -name SIGNALTAP_FILE output_files/rom.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/vdc.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/spr.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/adpcm.stp
-set_global_assignment -name VERILOG_FILE ../support/hybrid_pwm_sd_2ndorder.v
-set_global_assignment -name SDC_FILE mist.sdc
-set_global_assignment -name SDC_FILE ../tgfx16.sdc
-set_global_assignment -name VERILOG_FILE board_defs.v
+set_global_assignment -name SIGNALTAP_FILE stp1.stp
+set_global_assignment -name SLD_NODE_CREATOR_ID 110 -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_ENTITY_NAME sld_signaltap -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_clk -to "pce_top:pce_top|CLK" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[0] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[1] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[2] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[3] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[4] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[5] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[6] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[7] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[8] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[9] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[10] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[11] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[12] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[13] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[14] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[15] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[16] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|rdempty" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[17] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|rdreq" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[18] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|wrfull" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[19] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|wrreq" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[0] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[1] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[2] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[3] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[4] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[5] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[6] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[7] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|data[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[8] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[9] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[10] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[11] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[12] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[13] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[14] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[15] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|q[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[16] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|rdempty" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[17] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|rdreq" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[18] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|wrfull" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[19] -to "pce_top:pce_top|cd:CD|SCSI:SCSI|SCSI_FIFO:FIFO|wrreq" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_RAM_BLOCK_TYPE=AUTO" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_DATA_BITS=20" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_BITS=20" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_INFO=805334528" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_POWER_UP_TRIGGER=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_INVERSION_MASK=0000000000000000000000000000000000000000000000000000000000000000000000000000000000000" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_INVERSION_MASK_LENGTH=85" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_STORAGE_QUALIFIER_INVERSION_MASK_LENGTH=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_SEGMENT_SIZE=2048" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ATTRIBUTE_MEM_MODE=OFF" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_STATE_FLOW_USE_GENERATED=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_STATE_BITS=11" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_BUFFER_FULL_STOP=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_CURRENT_RESOURCE_WIDTH=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_LOWORD=7042" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_HIWORD=24183" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_LEVEL=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_SAMPLE_DEPTH=2048" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_IN_ENABLED=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ADVANCED_TRIGGER_ENTITY=basic,1," -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_LEVEL_PIPELINE=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ENABLE_ADVANCED_TRIGGER=0" -section_id auto_signaltap_0
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_global_assignment -name SLD_FILE db/stp1_auto_stripped.stp

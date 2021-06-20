@@ -1,3 +1,8 @@
+# Note: topmodule must be defined in a board-specific .sdc file,
+# which must come before this one in the file list.
+# For MiST it will typically be "", for other platforms which wrap the MiST toplevel
+# it will likely be "guest|"
+
 # Clock constraints
 
 set sdram_clk "${topmodule}pll|altpll_component|auto_generated|pll1|clk[0]"
