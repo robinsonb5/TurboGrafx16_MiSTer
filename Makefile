@@ -5,7 +5,7 @@ PROJECTPATH=./
 PROJECTTOROOT=../
 BOARD=
 ROMSIZE1=16384
-ROMSIZE2=2048
+ROMSIZE2=8192
 
 all: $(DEMISTIFYPATH)/site.mk firmware init compile tns mist
 
