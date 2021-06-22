@@ -115,9 +115,8 @@ architecture rtl of chameleon64_top is
 	signal spi_mosi : std_logic;
 	signal mmc_cs : std_logic;
 	signal spi_clk : std_logic;
-	signal spi_raw_ack : std_logic;
-	signal spi_raw_ack_d : std_logic;
 	signal spi_ack : std_logic;
+	signal spi_req : std_logic;
 
 -- internal SPI signals
 	
@@ -322,7 +321,8 @@ begin
 			mmc_cs_n => mmc_cs,
 			spi_raw_clk => spi_clk,
 			spi_raw_mosi => spi_mosi,
-			spi_raw_ack => spi_raw_ack,
+			spi_raw_req => spi_req,
+			spi_raw_ack => spi_ack,
 
 		-- LEDs
 			led_green => led_green,
@@ -373,14 +373,6 @@ begin
 	
 		);
 
-	-- Widen the SPI ack pulse		
-	process(clk_100,spi_raw_ack,spi_raw_ack_d)
-	begin
-		if rising_edge(clk_100) then
-			spi_raw_ack_d <= spi_raw_ack;
-		end if;
-		spi_ack <= spi_raw_ack or spi_raw_ack_d;
-	end process;
 
 	cdtv : entity work.chameleon_cdtv_remote
 	port map(
@@ -492,7 +484,8 @@ begin
 	generic map (
 		sysclk_frequency => 500,
 		debug => false,
-		SPI_FASTBIT => 3
+		SPI_FASTBIT => 3,
+		SPI_EXTERNALCLK => true
 	)
 	port map (
 		clk => clk_50,
@@ -510,6 +503,7 @@ begin
 		spi_ss3 => spi_ss3,
 		spi_ss4 => spi_ss4,
 		conf_data0 => conf_data0,
+		spi_req => spi_req,
 		spi_ack => spi_ack,
 		
 		-- PS/2 signals

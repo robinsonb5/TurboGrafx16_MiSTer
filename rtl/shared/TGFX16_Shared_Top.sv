@@ -62,9 +62,7 @@ assign LED  = ~ioctl_download & ~bk_ena;
 parameter CONF_STR = {
 	"TGFX16;;",
 	"F,BINPCESGX,Load;",
-`ifdef USE_CD
 	"SC,CUE,Mount CD;",
-`endif
 `ifdef USE_SAVERAM
 	"S0,SAV,Mount;",
 	"TF,Write Save RAM;",
