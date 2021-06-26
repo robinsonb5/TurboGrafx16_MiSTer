@@ -71,6 +71,7 @@ parameter CONF_STR = {
 	"P1O12,Scandoubler Fx,None,CRT 25%,CRT 50%,CRT 75%;",
 	"P1O3,Overscan,Hidden,Visible;",
 	"P1O4,Border Color,Original,Black;",
+	"P1O56,Composite blend,Off,Low,Medium,High;",
 	"P2,Controllers;",
 	"P2O8,Swap Joysticks,No,Yes;",
 	"P2O9,Turbo Tap,Disabled,Enabled;",
@@ -86,6 +87,7 @@ parameter CONF_STR = {
 wire [1:0] scanlines = status[2:1];
 wire       overscan = ~status[3];
 wire       border = ~status[4];
+wire [1:0] cofi = status[6:5];
 wire       joy_swap = status[8];
 wire       turbotap = status[9];
 wire       buttons6 = status[10];
@@ -560,6 +562,17 @@ wire [1:0] dcc;
 wire [2:0] ce_div = dcc == 2'b00 ? 3'd7 :
 		dcc == 2'b01 ? 3'd5 : 3'd3;
 
+reg [3:0] cofi_coeff;
+always @(posedge clk_sys)
+begin
+	case(cofi)
+		2'b00 : cofi_coeff<=4'd0;
+		2'b01 : cofi_coeff<=4'd7;
+		2'b10 : cofi_coeff<=4'd5;
+		2'b11 : cofi_coeff<=4'd3;
+	endcase
+end
+
 mist_video #(.SD_HCNT_WIDTH(10), .COLOR_DEPTH(3)) mist_video
 (
 	.clk_sys(clk_sys),
@@ -568,6 +581,7 @@ mist_video #(.SD_HCNT_WIDTH(10), .COLOR_DEPTH(3)) mist_video
 	.ypbpr(ypbpr),
 	.no_csync(no_csync),
 	.rotate(2'b00),
+	.blend(cofi_coeff),
 	.ce_divider(ce_div),
 	.SPI_DI(SPI_DI),
 	.SPI_SCK(SPI_SCK),
