@@ -36,6 +36,7 @@ module cofi_ng
 (
     input        clk,
     input        pix_ce,
+	 input        enable,
 	 input  [3:0] coefficient,
 	 input        scandoubler_disable,
 
@@ -61,8 +62,6 @@ module cofi_ng
 reg trigger;
 always @(posedge clk)
 	trigger <= !trigger | hblank | !scandoubler_disable;
-
-wire enable=|coefficient;
 
 cofi_iir #(.signalwidth(VIDEO_DEPTH)) rfilter
 (

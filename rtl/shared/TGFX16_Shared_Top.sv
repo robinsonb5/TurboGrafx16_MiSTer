@@ -563,13 +563,14 @@ wire [2:0] ce_div = dcc == 2'b00 ? 3'd7 :
 		dcc == 2'b01 ? 3'd5 : 3'd3;
 
 reg [3:0] cofi_coeff;
+wire cofi_ena = |cofi ? 1'b1 : 1'b0;
 always @(posedge clk_sys)
 begin
 	case(cofi)
 		2'b00 : cofi_coeff<=4'd0;
 		2'b01 : cofi_coeff<=4'd7;
-		2'b10 : cofi_coeff<=4'd5;
-		2'b11 : cofi_coeff<=4'd3;
+		2'b10 : cofi_coeff<=4'd6;
+		2'b11 : cofi_coeff<=4'd4;
 	endcase
 end
 
@@ -581,7 +582,8 @@ mist_video #(.SD_HCNT_WIDTH(10), .COLOR_DEPTH(3)) mist_video
 	.ypbpr(ypbpr),
 	.no_csync(no_csync),
 	.rotate(2'b00),
-	.blend(cofi_coeff),
+	.blend(cofi_ena),
+	.blend_coeff(cofi_coeff),
 	.ce_divider(ce_div),
 	.SPI_DI(SPI_DI),
 	.SPI_SCK(SPI_SCK),

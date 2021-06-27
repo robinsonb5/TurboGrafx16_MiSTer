@@ -31,7 +31,8 @@ module mist_video
 	// Rotate OSD [0] - rotate [1] - left or right
 	input  [1:0] rotate,
 	// composite-like blending
-	input  [3:0] blend,
+	input        blend,
+	input  [3:0] blend_coeff,
 
 	// video in
 	input  [COLOR_DEPTH-1:0] R,
@@ -57,7 +58,6 @@ parameter SD_SCNT_WIDTH = 12;
 parameter COLOR_DEPTH = 6; // 1-6
 parameter OSD_AUTO_CE = 1'b1;
 parameter SYNC_AND = 1'b0; // 0 - XOR, 1 - AND
-parameter COFI_COEFFICIENT = 6;
 
 // Scandouble the incoming signal. Scandoubler is bypassed if scandouble_disable is set.
 
@@ -127,7 +127,8 @@ cofi_ng #(.VIDEO_DEPTH(6)) cofi (
 	.clk     ( clk_sys ),
 	.pix_ce  ( pixel_ena ),
 	.scandoubler_disable ( scandoubler_disable ),
-	.coefficient ( blend   ),
+	.enable  ( blend ),
+	.coefficient ( blend_coeff   ),
 	.hblank  ( ~SD_HS_O ),
 	.hs      ( SD_HS_O ),
 	.vs      ( SD_VS_O ),
