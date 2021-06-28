@@ -117,8 +117,8 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 
 // Refresh logic
 
-// 64ms/8192 rows = 7.8us -> 842 cycles@108MHz
-localparam RFRSH_CYCLES = 11'd842;
+// 64ms/8192 rows = 7.8us / autorefresh
+localparam RFRSH_CYCLES = 7800*1000/SDRAM_tCK;
 reg [10:0] refresh_cnt = 11'b0;
 reg need_refresh;
 always @(posedge clk)

@@ -341,11 +341,7 @@ always @(posedge clk_mem) begin
 
 end
 
-`ifdef SDRAM_WINBOND
 sdram_amr #(.SDRAM_tCK(7813)) sdram // 128Mhz clock speed, tCK is ~7813ps
-`else
-sdram sdram
-`endif
 (
 	.*,
 	.init_n(locked),
