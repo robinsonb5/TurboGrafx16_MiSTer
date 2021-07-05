@@ -959,6 +959,10 @@ begin
 					end if;
 				when 1 => -- wait
 					RENDER_STATE := 2;
+					for i in 0 to 1 loop
+						-- pre-increment the address, so it's possible to fetch the next data without wait states
+						SPR_LINE_RENDER_ADDR(i) <= std_logic_vector(unsigned(SPR_LINE_RENDER_ADDR(i)) + 1);
+					end loop;
 				when 2 => -- check collision/write pixel to line buffer
 					for i in 0 to 1 loop
 						N := SPR_TILE_PIX xor (3 downto 0 => not SPR_TILE_HF);
@@ -982,13 +986,11 @@ begin
 							SPR_TILE_FRAME(to_integer(SPR_LINE_X)) <= '1'; -- lot of registers, but will optimized out if not debugging
 						end if;
 
-						SPR_LINE_RENDER_ADDR(to_integer(SPR_LINE_X(0 downto 0))) <= std_logic_vector(SPR_LINE_X(9 downto 1) + 1);
+						SPR_LINE_RENDER_ADDR(i) <= std_logic_vector(unsigned(SPR_LINE_RENDER_ADDR(i)) + 1);
 						SPR_TILE_PIX := SPR_TILE_PIX + 1;
 					end loop;
 					if SPR_TILE_PIX = 0 then
 						RENDER_STATE := 0;
-					else
-						RENDER_STATE := 1;
 					end if;
 			end case;
 
