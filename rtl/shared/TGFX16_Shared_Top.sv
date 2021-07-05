@@ -16,6 +16,9 @@
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
 
+// Optional placing of VRAM0 in block RAM if VRAM0INBRAM is defined
+// Exposed MAX_SPRITES parameter to toplevel.
+
 module TGFX16_Shared_Top
 (
    input         CLOCK_27,   // Input clock 27 MHz
@@ -53,7 +56,7 @@ module TGFX16_Shared_Top
    output        SDRAM_CLK,
    output        SDRAM_CKE
 );
-
+parameter MAX_SPRITES=16;
 localparam LITE = 0;
 
 assign LED  = ~ioctl_download & ~bk_ena;
@@ -80,6 +83,9 @@ parameter CONF_STR = {
 `endif
 	"P2OB,Mouse,Disable,Enable;",
 	"OE,Arcade Card,Disabled,Enabled;",
+`ifdef VRAM0INBRAM
+	"O7,VRAM0 in BRAM,Disabled,Enabled;",
+`endif
 	"T0,Reset;",
 	"V,v1.0.",`BUILD_DATE
 };
@@ -94,6 +100,7 @@ wire       buttons6 = status[10];
 wire       mouse_en = status[11];
 wire       bk_save = status[15];
 wire       ac_en = status[14];
+wire       vram0_in_bram = status[7];
 
 ////////////////////   CLOCKS   ///////////////////
 
@@ -321,8 +328,33 @@ always @(posedge clk_sys) begin
 
 end
 
-always @(posedge clk_mem) begin
+wire [15:0] vram0_q_sdram;
 
+`ifdef VRAM0INBRAM
+
+reg [15:0] vram0_int [32767:0];
+reg [15:0] vram0_q_int;
+reg [15:0] vram0_q_bram;
+always @(posedge clk_mem) begin
+	if(VRAM0_WE)
+		vram0_int[VRAM0_ADDR[15:1]]<=VRAM0_D;
+end
+
+always @(posedge clk_mem) begin
+	vram0_q_int<=vram0_int[VRAM0_ADDR[15:1]];
+	if(VRAM0_RD & ce_vidD)
+		vram0_q_bram<=vram0_q_int;
+end
+
+assign VRAM0_Q = vram0_in_bram ? vram0_q_bram : vram0_q_sdram;
+
+`else
+
+assign VRAM0_Q = vram0_q_sdram;
+
+`endif
+
+always @(posedge clk_mem) begin
 	vram0_weD <= VRAM0_WE;
 	vram0_rdD <= VRAM0_RD & ce_vidD;
 	vram0_din <= VRAM0_D;
@@ -330,7 +362,10 @@ always @(posedge clk_mem) begin
 		vram0_addr_sd <= VRAM0_ADDR[15:1];
 		vram0_req <= ~vram0_req;
 	end
+end
 
+
+always @(posedge clk_mem) begin
 	vram1_weD <= VRAM1_WE;
 	vram1_rdD <= VRAM1_RD & ce_vidD;
 	vram1_din <= VRAM1_D;
@@ -338,7 +373,6 @@ always @(posedge clk_mem) begin
 		vram1_addr_sd <= VRAM1_ADDR[15:1];
 		vram1_req <= ~vram1_req;
 	end
-
 end
 
 `ifdef SDRAM_WINBOND
@@ -371,7 +405,7 @@ sdram sdram
 	.vram0_ack(),
 	.vram0_addr(vram0_addr_sd),
 	.vram0_din(vram0_din),
-	.vram0_dout(VRAM0_Q),
+	.vram0_dout(vram0_q_sdram),
 	.vram0_we(vram0_weD),
 
 	.vram1_req(sgx & vram1_req),
@@ -447,7 +481,7 @@ wire signed [19:0] cdda_sl, cdda_sr;
 wire signed [15:0] adpcm_s;
 wire signed [19:0] psg_sl, psg_sr;
 
-pce_top #(.LITE(LITE), .PSG_O_WIDTH(20), .USE_INTERNAL_RAM(1'b1)) pce_top
+pce_top #(.LITE(LITE), .PSG_O_WIDTH(20), .USE_INTERNAL_RAM(1'b1),.MAX_SPRITES(MAX_SPRITES)) pce_top
 (
 	.RESET(reset),
 
