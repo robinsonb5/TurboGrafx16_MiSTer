@@ -35,7 +35,7 @@
 // (Because it's project-specific, not board-specific.)
 // If the core has a variable clock, specify the fastest rate.
 
-module sdram_amr #(parameter SDRAM_tCK) (
+module sdram_amr (
 	// interface to the MT48LC16M16 chip
 	inout  [15:0] SDRAM_DQ,   // 16 bit bidirectional data bus
 	output reg [`SDRAM_ROWBITS-1:0] SDRAM_A,    // 13 bit multiplexed address bus
@@ -89,6 +89,8 @@ module sdram_amr #(parameter SDRAM_tCK) (
 	input             aram_we
 );
 
+parameter SDRAM_tCK=7813; // Moved to old-style param for Verilator's benefit.
+
 localparam BANK_DELAY = ((`SDRAM_tRC+(SDRAM_tCK-1))/SDRAM_tCK)-2; // tRC-2 in cycles (rounded up)
 localparam BANK_WRITE_DELAY = ((`SDRAM_tRP+(SDRAM_tCK-1))/SDRAM_tCK)+`SDRAM_tWR; // tWR + tRP in cycles (rounded up)
 localparam REFRESH_DELAY = ((`SDRAM_tRC+(SDRAM_tCK-1))/SDRAM_tCK)-1; // tRC-1 in cycles (rounded up)
@@ -119,10 +121,22 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 
 // 64ms/8192 rows = 7.8us / autorefresh
 localparam RFRSH_CYCLES = 7800*1000/SDRAM_tCK;
-reg [10:0] refresh_cnt = 11'b0;
+reg [12:0] refresh_cnt = 13'b0;
 reg need_refresh;
-always @(posedge clk)
-	need_refresh <= (refresh_cnt >= RFRSH_CYCLES);
+reg refreshing;
+
+always @(posedge clk) begin
+
+	refresh_cnt <= refresh_cnt + 1'd1;
+
+	if(refreshing)
+		need_refresh<=1'b0;
+
+	if (refresh_cnt==RFRSH_CYCLES) begin
+		need_refresh <= 1'b1;
+		refresh_cnt<=13'b0;
+	end
+end
 
 // We don't synchronise to the host core except with regard to refresh cycles,
 // which must be timed so as not to delay a VRAM access.
@@ -177,17 +191,17 @@ assign SDRAM_DQML = sd_dqm[0];
 
 // Read cycle - CL2, burst 1:
 // |     RAS     |     CAS     |     MASK    |    LATCH    |     RAS     |     CAS     | ....
-// | Act  | .... | .... | Read | .... | .... | .... | Ltch | Act  | .... | .... | Read | .... 
-//                                            <chip><high z>
-//                                                  < din reg'd >
-//                                                         <data to port>
+// | Act  | .... | .... | Read | .... | .... | Ltch | Act  | .... | .... | Read | .... 
+//                                        <chip><high z>
+//                                           < din reg'd >
+//                                                   <data to port>
 
 // Read cycle - CL3, burst 1:
-// |     RAS     |     CAS     |     MASK    |    LATCH    |     ...     | RAS         |     CAS     | ....
-// | Act  | .... | .... | Read | DQMs | .... | .... | .... | Ltch | .... | Act  | .... | .... | Read | .... 
-//                                                   <chip><high z>
-//                                                         < din reg'd >
-//                                                                <data to port>
+// |     RAS     |     CAS     |     MASK    |    LATCH    |     ...     | RAS         |     CAS     |
+// | Act  | .... | .... | Read | DQMs | .... | .... | Ltch | .... | Act  | .... | .... | Read | .... 
+//                                               <chip><high z>
+//                                                  < din reg'd >
+//                                                         <data to port>
 
 // Because RAS happens on even cycles, and CAS happens on odd cycles, reads to different banks
 // can be overlapped - they just need to be 2 cycles apart:
@@ -195,25 +209,25 @@ assign SDRAM_DQML = sd_dqm[0];
 // CL2
 
 // |     RAS     |     CAS     |     MASK    |    LATCH    |     RAS     |     CAS     |
-// | Act  | .... | .... | Read | .... | .... | .... | Ltch | Act  | .... | .... | Read | ....
+// | Act  | .... | .... | Read | .... | .... | Ltch | .... | Act  | .... | .... | Read | ....
 
 // |     ...     |     RAS     |     CAS     |     MASK    |    LATCH    |     RAS     |
-// | .... | .... | Act  | .... | .... | Read | .... | .... | .... | Ltch | Act  | .... | .... 
+// | .... | .... | Act  | .... | .... | Read | .... | .... | Ltch | .... | Act  | .... | .... 
 
 // |     ...     |     ...     |     RAS     |     CAS     |     MASK    |    LATCH    | ....
-// | .... | .... | .... | .... | Act  | .... | .... | Read | .... | .... | .... | Ltch | Act  | .... |
+// | .... | .... | .... | .... | Act  | .... | .... | Read | .... | .... | Ltch | .... | Act
 
 
 // CL3
 
 // |     RAS     |     CAS     |     MASK    |    LATCH    |     ...     |     RAS     |     CAS     
-// | Act  | .... | .... | Read | DQMs | .... | .... | .... | Ltch | .... | Act  | .... | .... | Read 
+// | Act  | .... | .... | Read | DQMs | .... | .... | Ltch | .... | .... | Act  | .... | .... | Read 
 
 // |     ...     |     RAS     |     CAS     |     MASK    |    LATCH    |     ...     |     RAS     
-// | .... | .... | Act  | .... | .... | Read | DQMs | .... | .... | .... | Ltch | .... | Act  | .... 
+// | .... | .... | Act  | .... | .... | Read | DQMs | .... | .... | Ltch | .... | .... | Act  | .... 
 
 // |     ...     |     ...     |     RAS     |     CAS     |     MASK    |    LATCH    |     ...     
-// | .... | .... | .... | .... | Act  | .... | .... | Read | DQMs | .... | .... | .... | Ltch | .... 
+// | .... | .... | .... | .... | Act  | .... | .... | Read | DQMs | .... | .... | Ltch | .... | ....
 
 
 // Data can be transferred on alternate cycles, until all four banks have been serviced.
@@ -226,24 +240,27 @@ assign SDRAM_DQML = sd_dqm[0];
 
 
 // Write cycles can't immediately follow read cycles; two slots must be left empty
-// to avoid possible contention or mask clashes.
-
-// Read to write cycle, CL2, Burst 1:
-
-// |     RAS     |     CAS     |     MASK    |    LATCH    |     RAS     |     CAS     |
-// | Act  | .... | .... | Read | .... | .... | .... | Ltch | Act  | .... | .... | Read | ....
-
-// |     ...     |   (EMPTY)   |   (EMPTY)   |     RAS     |     CAS     |     MASK    |   
-// | .... | .... | .... | .... | .... | .... | Act  | .... | .... | Writ | .... | .... | ....
-
+// in CL3 mode to avoid possible contention or mask clashes.
 
 // Read to write cycle, CL3, Burst 1:
 
 // |     RAS     |     CAS     |     MASK    |    LATCH    |     ...     |     RAS     |     
-// | Act  | .... | .... | Read | DQMs | .... | .... | .... | Ltch | .... | ACT  | .... | .... 
+// | Act  | .... | .... | Read | DQMs | .... | .... | Ltch | .... | .... | ACT  | .... | .... 
 
 // |     ...     |   (EMPTY)   |   (EMPTY)   |     RAS     |     CAS     |     MASK    |   
 // | .... | .... | .... | .... | .... | .... | Act  | .... | .... | Writ | .... | .... | ....
+
+
+// (In CL2 mode one empty slot should be sufficient, provided we're not using bursts.)
+
+// Read to write cycle, CL2, Burst 1:
+
+// |     RAS     |     CAS     |     MASK    |    LATCH    |     RAS     |     CAS     |
+// | Act  | .... | .... | Read | .... | .... | Ltch | .... | Act  | .... | .... | Read | ....
+
+// |     ...     |   (EMPTY)   |   (EMPTY)   |     RAS     |     CAS     |     MASK    |   
+// | .... | .... | .... | .... | .... | .... | Act  | .... | .... | Writ | .... | .... | ....
+
 
 
 // Write cycles can be followed immediately by either a read or a write cycle.
@@ -356,14 +373,22 @@ reg [1:0] readcycles;
 // If VRAM wants to write we reserve a slot;
 // other ports have to wait for the bus to be idle.
 
+wire writepending_c;
 reg writepending;
-always @(posedge clk) begin
-	writepending <= (vram0_we & (vram0_req ^ port_state[PORT_VRAM0]))
+reg writeblocked;
+reg reservewrite;
+
+assign writepending_c = (vram0_we & (vram0_req ^ port_state[PORT_VRAM0]))
 			| (vram1_we & (vram1_req ^ port_state[PORT_VRAM1]));
+
+always @(posedge clk) begin
+	writepending <= writepending_c;
+	writeblocked <= |readcycles;
+	reservewrite <= writepending & (|readcycles);
 end
 
-wire writeblocked = |readcycles;
-wire reservewrite = writepending & writeblocked;
+//wire writeblocked = |readcycles;
+//wire reservewrite = writepending & writeblocked;
 
 reg port_state[10];
 
@@ -440,8 +465,6 @@ always @(posedge clk,negedge init_n) begin
 		reset<=5'd31;
 	end else begin
 
-		refresh_cnt <= refresh_cnt + 1'd1;
-
 		for(loopvar=0; loopvar<4; loopvar=loopvar+1) begin
 			if(!bankready[loopvar])
 				bankbusy[loopvar]<=bankbusy[loopvar]-4'b1;
@@ -458,26 +481,22 @@ always @(posedge clk,negedge init_n) begin
 			// initialization takes place at the end of the reset phase
 			sd_cmd<=CMD_INHIBIT;
 			if(bankready[0]) begin
+				case(reset)
+					16:	cas_addr[10]<=1'b1;	// Precharge all banks - set in advance to reduce address mux
+					15:	sd_cmd <= CMD_PRECHARGE;
+					10:	sd_cmd <= CMD_AUTO_REFRESH;
+					9:	sd_cmd <= CMD_AUTO_REFRESH;
+					8: sd_cmd <= CMD_AUTO_REFRESH;
+					7: sd_cmd <= CMD_AUTO_REFRESH;
+					6: sd_cmd <= CMD_AUTO_REFRESH;
+					5: sd_cmd <= CMD_AUTO_REFRESH;
+					3:	cas_addr <= MODE;	// Put the mode on the address bus in advance of the command.
+					2: begin
+						sd_cmd <= CMD_LOAD_MODE;
+						SDRAM_BA <= 2'b00;
+					end
+				endcase
 
-				if(reset == 16) begin
-					cas_addr[10]<=1'b1;	// Precharge all banks - set in advance to reduce address mux
-				end
-
-				if(reset == 15) begin
-					sd_cmd <= CMD_PRECHARGE;
-//					SDRAM_A[10] <= 1'b1;      // precharge all banks
-				end
-
-				if(reset == 10 || reset == 8) begin
-					sd_cmd <= CMD_AUTO_REFRESH;
-					cas_addr <= MODE;	// Put the mode on the address bus in advance of the command.
-				end
-
-				if(reset == 2) begin
-					sd_cmd <= CMD_LOAD_MODE;
-//					SDRAM_A <= MODE;
-					SDRAM_BA <= 2'b00;
-				end
 				reset<=reset-1'b1;
 				bankbusy[0]<=BANK_DELAY[4:0];
 				if(reset==0)
@@ -500,6 +519,7 @@ always @(posedge clk,negedge init_n) begin
 			ras1_act<=1'b0;
 			ras2_port<=ras1_port;
 			ras2_act<=ras1_act;
+			refreshing<=1'b0;
 
 			if(!ras1_act && !cas1_act) begin // Pick a bank and dispatch the command
 				readcycles<={1'b0,readcycles[1]};
@@ -512,7 +532,7 @@ always @(posedge clk,negedge init_n) begin
 				// waiting for the bus to be idle.
 				if(!(&bankreq) && need_refresh && (&bankready) & !blockrefresh) begin
 					sd_cmd<=CMD_AUTO_REFRESH;
-					refresh_cnt<=0;
+					refreshing<=1'b1;
 					bankbusy[0]<=REFRESH_DELAY[4:0];
 					bankbusy[1]<=REFRESH_DELAY[4:0];
 					bankbusy[2]<=REFRESH_DELAY[4:0];
@@ -520,7 +540,11 @@ always @(posedge clk,negedge init_n) begin
 				end else if(!reservewrite) begin
 					// VRAM ports have priority
 					if(bankreq[2] && bankready[2] && (!writepending || bankwr[2]) && !(writeblocked && bankwr[2])) begin
-						readcycles[1]<=~bankwr[2];
+						// We have to block two subsequent write slots,
+						// unless we're operating CL2 with burst 1,
+						// in which case we only need to block 1
+						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[2];
+
 						port_state[bankport[2]]<=bankstate[2];
 						bankbusy[2]<=BANK_DELAY[4:0];
 						ras_ba<=2'b10;
@@ -535,7 +559,7 @@ always @(posedge clk,negedge init_n) begin
 						SDRAM_A <= bankaddr[2][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b10;
 					end else if(bankreq[3] && bankready[3] && (!writepending || bankwr[3]) && !(writeblocked && bankwr[3])) begin
-						readcycles[1]<=~bankwr[3];
+						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[3];
 						port_state[bankport[3]]<=bankstate[3];
 						bankbusy[3]<=BANK_DELAY[4:0];
 						ras_ba<=2'b11;
@@ -550,7 +574,7 @@ always @(posedge clk,negedge init_n) begin
 						SDRAM_A <= bankaddr[3][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b11;
 					end else if(bankreq[0] && bankready[0] && (!writepending || bankwr[0]) && !(writeblocked && bankwr[0])) begin
-						readcycles[1]<=~bankwr[0];
+						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[0];
 						port_state[bankport[0]]<=bankstate[0];
 						bankbusy[0]<=BANK_DELAY[4:0];
 						ras_ba<=2'b00;
@@ -565,7 +589,7 @@ always @(posedge clk,negedge init_n) begin
 						SDRAM_A <= bankaddr[0][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b00;
 					end else if(bankreq[1] && bankready[1] && (!writepending || bankwr[1]) && !(writeblocked && bankwr[1])) begin
-						readcycles[1]<=~bankwr[1];
+						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[1];
 						port_state[bankport[1]]<=bankstate[1];
 						bankbusy[1]<=BANK_DELAY[4:0];
 						ras_ba<=2'b01;
@@ -722,3 +746,5 @@ always @(posedge clk, negedge init_n) begin
 end
 
 endmodule
+
+
