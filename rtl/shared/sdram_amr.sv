@@ -30,12 +30,16 @@
 // SDRAM_tRC <Ref/Act to Ref/Act in ps>
 // SDRAM_tWR <write recovery time in cycles>
 // SDRAM_tRP <precharge time in ps>
+// SDRAM_RISKCONTENTION <set to 1 to leave less space between reads and subsequent writes in CL3 mode.>
 //
 // SDRAM_tCK <cycle time in ps> must be supplied as a parameter
 // (Because it's project-specific, not board-specific.)
 // If the core has a variable clock, specify the fastest rate.
 
-module sdram_amr (
+`define SDRAM_RISKCONTENTION 0
+
+module sdram_amr #(parameter SDRAM_tCK=7800 )
+(
 	// interface to the MT48LC16M16 chip
 	inout  [15:0] SDRAM_DQ,   // 16 bit bidirectional data bus
 	output reg [`SDRAM_ROWBITS-1:0] SDRAM_A,    // 13 bit multiplexed address bus
@@ -89,8 +93,6 @@ module sdram_amr (
 	input             aram_we
 );
 
-parameter SDRAM_tCK=7813; // Moved to old-style param for Verilator's benefit.
-
 localparam BANK_DELAY = ((`SDRAM_tRC+(SDRAM_tCK-1))/SDRAM_tCK)-2; // tRC-2 in cycles (rounded up)
 localparam BANK_WRITE_DELAY = ((`SDRAM_tRP+(SDRAM_tCK-1))/SDRAM_tCK)+`SDRAM_tWR; // tWR + tRP in cycles (rounded up)
 localparam REFRESH_DELAY = ((`SDRAM_tRC+(SDRAM_tCK-1))/SDRAM_tCK)-1; // tRC-1 in cycles (rounded up)
@@ -115,50 +117,6 @@ localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
 localparam NO_WRITE_BURST = 1'b1;   // 0= write burst enabled, 1=only single access write
 
 localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, BURST_LENGTH}; 
-
-
-// Refresh logic
-
-// 64ms/8192 rows = 7.8us / autorefresh
-localparam RFRSH_CYCLES = 7800*1000/SDRAM_tCK;
-reg [12:0] refresh_cnt = 13'b0;
-reg need_refresh;
-reg refreshing;
-
-always @(posedge clk) begin
-
-	refresh_cnt <= refresh_cnt + 1'd1;
-
-	if(refreshing)
-		need_refresh<=1'b0;
-
-	if (refresh_cnt==RFRSH_CYCLES) begin
-		need_refresh <= 1'b1;
-		refresh_cnt<=13'b0;
-	end
-end
-
-// We don't synchronise to the host core except with regard to refresh cycles,
-// which must be timed so as not to delay a VRAM access.
-// We supply a four-cycle window beginning shortly after clkref drops, during
-// which refresh may begin.
-
-reg clkref_d3;
-reg clkref_d2;
-reg clkref_d;
-reg [2:0] refreshwindow;
-
-always@(posedge clk) begin
-	clkref_d3<=clkref;
-	clkref_d2<=clkref_d3;
-	clkref_d<=clkref_d2;
-	if(clkref_d && !clkref_d2)
-			refreshwindow<=3'b000;
-	if(!blockrefresh)
-		refreshwindow<=refreshwindow+1'b1;
-end
-
-wire blockrefresh = refreshwindow[2];
 
 
 // RAM control signals
@@ -265,6 +223,140 @@ assign SDRAM_DQML = sd_dqm[0];
 
 // Write cycles can be followed immediately by either a read or a write cycle.
 
+// Refresh logic
+
+// 64ms/8192 rows = 7.8us / autorefresh
+//localparam RFRSH_CYCLES = (7800*1000/SDRAM_tCK)-2;
+//localparam FORCERFRSH_CYCLES = RFRSH_CYCLES-6; // Force a refresh if a suitable opportunity hasn't presented itself.
+//reg [12:0] refresh_cnt[4]; // Do we need four separate counters?  Depends whether we want to stagger refreshes.
+//reg [3:0] need_refresh;
+//reg [3:0] force_refresh;
+//reg [12:0] refresh_addr[4];
+//integer refreshbank;
+
+//always @(posedge clk) begin
+//	for(refreshbank=0; refreshbank<4; refreshbank=refreshbank+1) begin
+//		refresh_cnt[refreshbank] <= refresh_cnt[refreshbank] + 1'd1;
+
+//		if (refresh_cnt[refreshbank]==FORCERFRSH_CYCLES)
+//			force_refresh[refreshbank]<=need_refresh[refreshbank];
+
+//		if(cas2_port==PORT_REFRESH && cas_ba==refreshbank[1:0]) begin
+//			need_refresh[refreshbank]<=1'b0;
+//			force_refresh[refreshbank]<=1'b0;
+//			refresh_addr[refreshbank]<=refresh_addr[refreshbank]+1;
+//		end
+
+//		if (refresh_cnt[refreshbank]==RFRSH_CYCLES) begin
+//			need_refresh[refreshbank] <= 1'b1;
+//			refresh_cnt[refreshbank]<=13'b0;
+//		end
+//	end
+//end
+
+
+// Refresh cycles must be carefully timed so as not to disrupt
+// regular accesses.  For VRAM we synchronise to the incoming
+// reference pixel clock and supply a four-cycle window beginning
+// shortly after clkref drops, during which refresh may begin.
+
+reg evencycle;
+reg clkref_d;
+reg [2:0] refreshwindow;
+
+always@(posedge clk) begin
+	evencycle<=!evencycle;
+
+	clkref_d<=clkref;
+	if(clkref_d && !clkref) begin
+			refreshwindow<=3'b001;
+			evencycle<=1'b1;
+	end
+	if(|refreshwindow)
+		refreshwindow<=refreshwindow-1'b1;
+end
+
+wire allowrefresh_vram = |refreshwindow;
+
+
+// Time refreshes for CPU-originated requests so that they
+// immediately follow a ROM request...
+
+reg [3:0] romsync_ctr;
+reg rom_req_d;
+reg allowrefresh_rom;
+
+always @(posedge clk or negedge init_n) begin
+	if(!init_n)
+		allowrefresh_rom<=1'b0;
+	else begin
+		rom_req_d<=rom_req;
+		if(|romsync_ctr)
+			romsync_ctr<=romsync_ctr-1'b1;
+		else
+			allowrefresh_rom<=1'b0;
+
+		if(rom_req_d!=rom_req) begin
+			allowrefresh_rom<=1'b1;
+			romsync_ctr<=4'hf;
+		end
+	end
+end
+
+wire need_refresh[4];
+wire force_refresh[4];
+reg [12:0] refresh_addr_0;
+reg [5:0] refresh_addr_1;
+reg [4:0] refresh_addr_2;
+reg [4:0] refresh_addr_3;
+
+refresh_schedule #(.tCK(SDRAM_tCK),.rowbits(13)) refresh_bank0
+(
+	.clk(clk),
+	.reset_n(init_n),
+	.req(sync),
+	.refreshing(cas2_port==PORT_REFRESH && cas_ba==2'b00 ? 1'b1 : 1'b0),
+	.allow(allowrefresh_rom),
+	.refresh_req(need_refresh[0]),
+	.refresh_force(force_refresh[0]),
+	.addr(refresh_addr_0)
+);
+
+refresh_schedule #(.tCK(SDRAM_tCK),.rowbits(6)) refresh_bank1
+(
+	.clk(clk),
+	.reset_n(init_n),
+	.req(sync),
+	.refreshing(cas2_port==PORT_REFRESH && cas_ba==2'b01 ? 1'b1 : 1'b0),
+	.allow(allowrefresh_rom),
+	.refresh_req(need_refresh[1]),
+	.refresh_force(force_refresh[1]),
+	.addr(refresh_addr_1)
+);
+
+refresh_schedule #(.tCK(SDRAM_tCK),.rowbits(5)) refresh_bank2
+(
+	.clk(clk),
+	.reset_n(init_n),
+	.req(vram0_req),
+	.refreshing(cas2_port==PORT_REFRESH && cas_ba==2'b10 ? 1'b1 : 1'b0),
+	.allow(allowrefresh_vram),
+	.refresh_req(need_refresh[2]),
+	.refresh_force(force_refresh[2]),
+	.addr(refresh_addr_2)
+);
+
+refresh_schedule #(.tCK(SDRAM_tCK),.rowbits(5)) refresh_bank3
+(
+	.clk(clk),
+	.reset_n(init_n),
+	.req(vram1_req),
+	.refreshing(cas2_port==PORT_REFRESH && cas_ba==2'b11 ? 1'b1 : 1'b0),
+	.allow(allowrefresh_vram),
+	.refresh_req(need_refresh[3]),
+	.refresh_force(force_refresh[3]),
+	.addr(refresh_addr_3)
+);
 
 
 // Bank logic.
@@ -288,9 +380,11 @@ localparam PORT_WRAM   = 4'd2;
 localparam PORT_VRAM0  = 4'd3;
 localparam PORT_VRAM1  = 4'd4;
 localparam PORT_ARAM   = 4'd5;
+localparam PORT_REFRESH = 4'd6;
 
 reg [3:0] bankreq;
 reg [3:0] bankstate;
+reg [3:0] bankrd;
 reg [3:0] bankwr;
 reg [15:0] bankwrdata[4];
 reg [3:0] bankport[4];
@@ -300,67 +394,117 @@ reg [1:0] bankdqm[4];
 
 // Bank 0 priority encoder - WRAM / ARAM
 always @(posedge clk) begin
-	if (wram_req ^ port_state[PORT_WRAM]) begin
-		bankreq[0]=1'b1;
+	if ((!force_refresh[0]) && wram_req ^ port_state[PORT_WRAM]) begin
+		bankreq[0]=evencycle;
 		bankstate[0]=wram_req;
 		bankport[0]=PORT_WRAM;
 		bankdqm[0]=wram_we ? { ~wram_addr[0], wram_addr[0] } : 2'b11;
 		bankaddr[0]={2'b01,wram_addr[21:1]};
+		bankrd[0]=!wram_we;
 		bankwr[0]=wram_we;
 		bankwrdata[0]={wram_din,wram_din};
-	end else if (aram_req ^ port_state[PORT_ARAM]) begin
-		bankreq[0]= 1'b1;
-		bankstate[0]=aram_req;
-		bankport[0]=PORT_ARAM;
-		bankdqm[0]=aram_we ? { ~aram_addr[0], aram_addr[0] } : 2'b11;
-		bankaddr[0]={7'b0000001,aram_addr[16:1]};
-		bankwr[0]=aram_we;
-		bankwrdata[0]={aram_din,aram_din};
+	end else if((!force_refresh[0]) && rom_req ^ port_state[PORT_ROM]) begin
+		bankreq[0]=1'b1;
+		bankstate[0]=rom_req;
+		bankport[0]=PORT_ROM;
+		bankdqm[0]={!rom_we,!rom_we};
+		bankwrdata[0]=rom_din;
+		bankaddr[0]={2'b00,rom_addr[21:1]};
+		bankrd[0]=!rom_we;
+		bankwr[0]=rom_we;
 	end else begin
-		bankreq[0]=1'b0;
-		// Just to avoid creating latches
+		// Manual refresh logic on idle cycles
+		// If we prevent any action on CAS we can do refreshes even when
+		// writes are blocked.
+		bankreq[0]=evencycle&need_refresh[0];// &! blockrefresh;
 		bankwr[0]=1'b0;
-		bankstate[0]=wram_req;
-		bankdqm[0]=wram_we ? { ~wram_addr[0], wram_addr[0] } : 2'b11;
-		bankaddr[0]={2'b01, wram_addr[21:1]};
-		bankwr[0]=wram_we;
+		bankstate[0]=1'b0;
+		bankdqm[0]=2'b11;
+		bankaddr[0][`SDRAM_COLBITS:1]<=wram_addr[`SDRAM_COLBITS:1]; // Don't care bits map to another port
+		bankaddr[0][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1]<=refresh_addr_0;//,{`SDRAM_COLBITS{1'b0}}};
+		bankrd[0]=1'b0;
+		bankwr[0]=1'b0;
 		bankwrdata[0]={wram_din,wram_din};
-		bankport[0]=PORT_NONE;
+		bankport[0]=PORT_REFRESH;
 	end
 end
 
 
 // ROM has Bank 1 to itself
 always @(posedge clk) begin
-	bankreq[1]=rom_req ^ port_state[PORT_ROM];
-	bankstate[1]=rom_req;
-	bankport[1]=PORT_ROM;
-	bankaddr[1]={2'b00,rom_addr[21:1]};
-	bankdqm[1]={!rom_we,!rom_we};
-	bankwr[1]=rom_we;
-	bankwrdata[1]=rom_din;
+	bankdqm[1]=aram_we ? { ~aram_addr[0], aram_addr[0] } : 2'b11;
+	bankwrdata[1]={aram_din,aram_din};
+	if ((!force_refresh[1]) && aram_req ^ port_state[PORT_ARAM]) begin
+		bankreq[1]= evencycle;
+		bankstate[1]=aram_req;
+		bankport[1]=PORT_ARAM;
+		bankaddr[1]={7'b0000001,aram_addr[16:1]};
+		bankrd[1]=!aram_we;
+		bankwr[1]=aram_we;
+	end else begin
+		// Manual refresh logic on idle cycles
+		// If we prevent any action on CAS we can do refreshes even when
+		// writes are blocked.
+		bankreq[1]=evencycle&need_refresh[1];// &! blockrefresh;
+		bankstate[1]=1'b0;
+		bankaddr[1][`SDRAM_COLBITS:1]<=rom_addr[`SDRAM_COLBITS:1]; // Don't care bits map to another port
+		bankaddr[1]={2'b00,rom_addr[21:1]}; // Don't care bits map to another port
+		bankaddr[1][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1]<={7'b0000000,refresh_addr_1};//,{`SDRAM_COLBITS{1'b0}}};
+		bankrd[1]=1'b0;
+		bankwr[1]=1'b0;
+		bankport[1]=PORT_REFRESH;
+	end
 end
 
 // VRAM0 occupies Bank 2
 always @(posedge clk) begin
-	bankreq[2]=vram0_req ^ port_state[PORT_VRAM0];
-	bankstate[2]=vram0_req;
-	bankport[2]=PORT_VRAM0;
-	bankaddr[2]={8'b00000000,vram0_addr};
-	bankwr[2]=vram0_we;
 	bankwrdata[2]=vram0_din;
 	bankdqm[2]={!vram0_we,!vram0_we};
+	if((!force_refresh[2]) && vram0_req ^ port_state[PORT_VRAM0]) begin
+		bankreq[2]=vram0_req ^ port_state[PORT_VRAM0];
+		bankstate[2]=vram0_req;
+		bankport[2]=PORT_VRAM0;
+		bankaddr[2]={8'b00000000,vram0_addr};
+		bankrd[2]=!vram0_we;
+		bankwr[2]=vram0_we;
+	end else begin
+		// Manual refresh logic on idle cycles
+		// If we prevent any action on CAS we can do refreshes even when
+		// writes are blocked.
+		bankreq[2]=need_refresh[2];
+		bankstate[2]=1'b0;
+		bankaddr[2][`SDRAM_COLBITS:1]<=vram0_addr[`SDRAM_COLBITS:1]; // Don't care bits map to another port
+		bankaddr[2][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1]<={8'h00,refresh_addr_2};//,{`SDRAM_COLBITS{1'b0}}};
+		bankrd[2]=1'b0;
+		bankwr[2]=1'b0;
+		bankport[2]=PORT_REFRESH;
+	end
 end
 
 // VRAM1 occupies Bank 3
 always @(posedge clk) begin
-	bankreq[3]=vram1_req ^ port_state[PORT_VRAM1];
-	bankstate[3]=vram1_req;
-	bankport[3]=PORT_VRAM1;
-	bankaddr[3]={8'b00000000,vram1_addr};
-	bankwr[3]=vram1_we;
 	bankwrdata[3]=vram1_din;
 	bankdqm[3]={!vram1_we,!vram1_we};
+	if((!force_refresh[3]) && vram1_req ^ port_state[PORT_VRAM1]) begin
+		bankreq[3]=1'b1;
+		bankstate[3]=vram1_req;
+		bankport[3]=PORT_VRAM1;
+		bankaddr[3]={8'b00000000,vram1_addr};
+		bankrd[3]=!vram1_we;
+		bankwr[3]=vram1_we;
+	end else begin
+		// Manual refresh logic on idle cycles
+		// If we prevent any action on CAS we can do refreshes even when
+		// writes are blocked.
+		bankreq[3]=need_refresh[3];
+		bankstate[3]=1'b0;
+//		bankaddr[3]<=23'b0;
+		bankaddr[3][`SDRAM_COLBITS:1]=vram1_addr[`SDRAM_COLBITS:1]; // Don't care bits map to another port
+		bankaddr[3][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1]<={8'h00,refresh_addr_3};//,{`SDRAM_COLBITS{1'b0}}};
+		bankrd[3]=1'b0;
+		bankwr[3]=1'b0;
+		bankport[3]=PORT_REFRESH;
+	end
 end
 
 
@@ -400,6 +544,7 @@ reg port_state[10];
 reg [1:0] ras_ba;
 reg [`SDRAM_COLBITS-1:0] ras_casaddr;
 reg ras_wr;
+reg ras_rd;
 reg [15:0] ras_wrdata;
 reg [1:0] ras_dqm;
 reg [3:0] ras1_port;
@@ -416,6 +561,7 @@ reg [3:0] cas2_port;
 reg [1:0] cas_ba;
 reg [`SDRAM_ROWBITS-1:0] cas_addr;
 reg cas_wr;
+reg cas_rd;
 reg [15:0] cas_wrdata;
 reg [1:0] cas_dqm;
 
@@ -442,6 +588,7 @@ assign SDRAM_DQ = dq_reg;
 
 reg init = 1'b1;
 reg [4:0] reset;
+
 
 always @(posedge clk,negedge init_n) begin
 
@@ -482,10 +629,10 @@ always @(posedge clk,negedge init_n) begin
 			sd_cmd<=CMD_INHIBIT;
 			if(bankready[0]) begin
 				case(reset)
-					16:	cas_addr[10]<=1'b1;	// Precharge all banks - set in advance to reduce address mux
+					16: cas_addr[10]<=1'b1;	// Precharge all banks - set in advance to reduce address mux
 					15:	sd_cmd <= CMD_PRECHARGE;
-					10:	sd_cmd <= CMD_AUTO_REFRESH;
-					9:	sd_cmd <= CMD_AUTO_REFRESH;
+					10: sd_cmd <= CMD_AUTO_REFRESH;
+					9: sd_cmd <= CMD_AUTO_REFRESH;
 					8: sd_cmd <= CMD_AUTO_REFRESH;
 					7: sd_cmd <= CMD_AUTO_REFRESH;
 					6: sd_cmd <= CMD_AUTO_REFRESH;
@@ -519,36 +666,28 @@ always @(posedge clk,negedge init_n) begin
 			ras1_act<=1'b0;
 			ras2_port<=ras1_port;
 			ras2_act<=ras1_act;
-			refreshing<=1'b0;
 
 			if(!ras1_act && !cas1_act) begin // Pick a bank and dispatch the command
 				readcycles<={1'b0,readcycles[1]};
 				ras_wr<=1'b0;
+				ras_rd<=1'b0;
 				ras_dqm<=2'b11;
 				
 				// First check and initiate refresh cycles if necessary.
 
-				// FIXME should really have some way to force refreshes rather than 
-				// waiting for the bus to be idle.
-				if(!(&bankreq) && need_refresh && (&bankready) & !blockrefresh) begin
-					sd_cmd<=CMD_AUTO_REFRESH;
-					refreshing<=1'b1;
-					bankbusy[0]<=REFRESH_DELAY[4:0];
-					bankbusy[1]<=REFRESH_DELAY[4:0];
-					bankbusy[2]<=REFRESH_DELAY[4:0];
-					bankbusy[3]<=REFRESH_DELAY[4:0];
-				end else if(!reservewrite) begin
+				if(!reservewrite) begin
 					// VRAM ports have priority
 					if(bankreq[2] && bankready[2] && (!writepending || bankwr[2]) && !(writeblocked && bankwr[2])) begin
 						// We have to block two subsequent write slots,
 						// unless we're operating CL2 with burst 1,
 						// in which case we only need to block 1
-						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[2];
+						readcycles[(`SDRAM_RISKCONTENTION || `SDRAM_CL==2) && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[2];
 
 						port_state[bankport[2]]<=bankstate[2];
 						bankbusy[2]<=BANK_DELAY[4:0];
 						ras_ba<=2'b10;
 						ras_casaddr<=bankaddr[2][`SDRAM_COLBITS:1];
+						ras_rd<=bankrd[2];
 						ras_wr<=bankwr[2];
 						ras_wrdata<=bankwrdata[2];
 						ras_dqm<=bankdqm[2];
@@ -559,11 +698,12 @@ always @(posedge clk,negedge init_n) begin
 						SDRAM_A <= bankaddr[2][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b10;
 					end else if(bankreq[3] && bankready[3] && (!writepending || bankwr[3]) && !(writeblocked && bankwr[3])) begin
-						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[3];
+						readcycles[(`SDRAM_RISKCONTENTION || `SDRAM_CL==2) && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[3];
 						port_state[bankport[3]]<=bankstate[3];
 						bankbusy[3]<=BANK_DELAY[4:0];
 						ras_ba<=2'b11;
 						ras_casaddr<=bankaddr[3][`SDRAM_COLBITS:1];
+						ras_rd<=bankrd[3];
 						ras_wr<=bankwr[3];
 						ras_wrdata<=bankwrdata[3];
 						ras_dqm<=bankdqm[3];
@@ -574,11 +714,12 @@ always @(posedge clk,negedge init_n) begin
 						SDRAM_A <= bankaddr[3][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b11;
 					end else if(bankreq[0] && bankready[0] && (!writepending || bankwr[0]) && !(writeblocked && bankwr[0])) begin
-						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[0];
+						readcycles[(`SDRAM_RISKCONTENTION || `SDRAM_CL==2) && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[0];
 						port_state[bankport[0]]<=bankstate[0];
 						bankbusy[0]<=BANK_DELAY[4:0];
 						ras_ba<=2'b00;
 						ras_casaddr<=bankaddr[0][`SDRAM_COLBITS:1];
+						ras_rd<=bankrd[0];
 						ras_wr<=bankwr[0];
 						ras_wrdata<=bankwrdata[0];
 						ras_dqm<=bankdqm[0];
@@ -589,11 +730,12 @@ always @(posedge clk,negedge init_n) begin
 						SDRAM_A <= bankaddr[0][`SDRAM_ROWBITS+`SDRAM_COLBITS:`SDRAM_COLBITS+1];
 						SDRAM_BA <= 2'b00;
 					end else if(bankreq[1] && bankready[1] && (!writepending || bankwr[1]) && !(writeblocked && bankwr[1])) begin
-						readcycles[`SDRAM_CL==2 && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[1];
+						readcycles[(`SDRAM_RISKCONTENTION || `SDRAM_CL==2) && BURST_LENGTH==3'b000 ? 0 : 1]<=~bankwr[1];
 						port_state[bankport[1]]<=bankstate[1];
 						bankbusy[1]<=BANK_DELAY[4:0];
 						ras_ba<=2'b01;
 						ras_casaddr<=bankaddr[1][`SDRAM_COLBITS:1];
+						ras_rd<=bankrd[1];
 						ras_wr<=bankwr[1];
 						ras_wrdata<=bankwrdata[1];
 						ras_dqm<=bankdqm[1];
@@ -611,6 +753,7 @@ always @(posedge clk,negedge init_n) begin
 				cas_addr<={`SDRAM_ROWBITS{1'b0}};
 				cas_addr[10]<=1'b1; // Auto-precharge
 				cas_addr[`SDRAM_COLBITS-1:0]<=ras_casaddr;
+				cas_rd<=ras_rd;
 				cas_wr<=ras_wr;
 				cas_dqm<=ras_dqm;
 				cas_wrdata<=ras_wrdata;
@@ -668,8 +811,10 @@ end
 
 reg [15:0] vram0_dout_r;
 reg [15:0] vram1_dout_r;
+reg [15:0] rom_dout_r;
 assign vram0_dout=latch2_port == PORT_VRAM0 ? sd_din : vram0_dout_r;
 assign vram1_dout=latch2_port == PORT_VRAM1 ? sd_din : vram1_dout_r;
+assign rom_dout=latch2_port == PORT_ROM ? sd_din : rom_dout_r;
 
 always @(posedge clk, negedge init_n) begin
 
@@ -734,8 +879,12 @@ always @(posedge clk, negedge init_n) begin
 		end
 		latch2_port<=latch1_port;
 
+		case (latch1_port)
+			PORT_ROM:  rom_req_ack <= rom_req;
+		endcase
+
 		case (latch2_port)
-			PORT_ROM:   begin rom_dout    <= sd_din; rom_req_ack <= rom_req;   end
+			PORT_ROM:   begin rom_dout_r    <= sd_din; end
 			PORT_WRAM:  begin wram_dout   <= sd_din; wram_req_ack <= wram_req; end
 			PORT_VRAM0: begin vram0_dout_r  <= sd_din; end // vram0_ack <= vram0_req;   end // Ack'ed early
 			PORT_VRAM1: begin vram1_dout_r  <= sd_din; end // vram1_ack <= vram1_req;   end // Ack'ed early
@@ -748,3 +897,64 @@ end
 endmodule
 
 
+module refresh_schedule #(parameter tCK=7813, parameter tREF=64, parameter rowbits=13)
+(
+	input clk,
+	input reset_n,
+	input req,
+	input refreshing,
+	input allow,
+	output refresh_req,
+	output refresh_force,
+	output [rowbits-1:0] addr
+);
+
+// Refresh timing: (2*rowbits) refreshes = tREF milliseconds
+// 1 refresh = tREF/(2**rowbit) ms
+// 1 ms = 10^9 / tCK cycles
+// 1 refresh = (10^9*tREF)/(tCK * 2**rowbit) cycles;
+localparam khz = (10**9)/tCK;
+localparam ticksperrefresh = (khz*tREF)/(2**rowbits)-2;
+localparam forcetime = ticksperrefresh-4;
+reg [19:0] refresh_count;
+reg need_refresh;
+reg force_refresh;
+
+reg [rowbits-1:0] addr_r;
+
+assign refresh_req=(allow & need_refresh) | force_refresh;
+assign refresh_force=force_refresh;
+reg req_d;
+
+always @(posedge clk or negedge reset_n) begin
+	if(!reset_n) begin
+		addr_r<={rowbits{1'b0}};
+		refresh_count<=20'b0;
+`ifdef VERILATOR
+		$display("%m : tpr %d",ticksperrefresh);
+`endif
+	end else begin
+		req_d<=req;
+
+		refresh_count<=refresh_count+1'b1;
+
+		if(refreshing) begin
+			need_refresh<=1'b0;
+			force_refresh<=1'b0;
+			addr_r<=addr_r+1'b1;
+		end
+
+		if(refresh_count==ticksperrefresh) begin
+			need_refresh<=1'b1;
+			refresh_count<=20'b0;
+		end
+
+		if(refresh_count==forcetime) begin
+			force_refresh<=need_refresh;
+		end
+	end
+end
+
+assign addr=addr_r;
+
+endmodule
